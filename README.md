@@ -1,6 +1,11 @@
 # Mixer
 A simple caching service that redirects requests to a specific upstream foreign exchange rate provider.
 
+### Build
+```
+./gradlew bootBuildImage
+```
+
 ### Configuration
 Run with `OANDA_TOKEN` environment variable set to your Oanda API token.
 

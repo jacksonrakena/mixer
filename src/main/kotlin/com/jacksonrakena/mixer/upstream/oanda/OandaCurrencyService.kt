@@ -16,7 +16,7 @@ import java.util.logging.Logger
 data class OandaResponse(
     val instrument: String,
     val granularity: String,
-    val candles: Array<Candlestick>
+    val candles: List<Candlestick>
 )
 data class Candlestick(
     val time: Instant,
