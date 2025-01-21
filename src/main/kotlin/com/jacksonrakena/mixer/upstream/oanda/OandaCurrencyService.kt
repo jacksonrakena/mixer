@@ -3,6 +3,7 @@ package com.jacksonrakena.mixer.upstream.oanda
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.annotation.JsonNaming
 import com.jacksonrakena.mixer.MixerApplication
+import com.jacksonrakena.mixer.upstream.CurrencyRangeResponse
 import com.jacksonrakena.mixer.upstream.CurrencyResponse
 import com.jacksonrakena.mixer.upstream.CurrencyResponseMeta
 import com.jacksonrakena.mixer.upstream.CurrencyService
@@ -11,6 +12,7 @@ import org.springframework.http.HttpStatusCode
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import java.time.Instant
+import java.time.ZoneId
 import java.util.logging.Logger
 
 data class OandaResponse(
@@ -63,8 +65,38 @@ class OandaCurrencyService(val app: MixerApplication, val client: RestClient) : 
             rate = rate,
             meta = CurrencyResponseMeta(
                 generatedAt = Instant.now(),
-                generatedBy = "oanda"
+                generatedBy = "oanda",
+                dateOfRate = Instant.now()
             )
+        )
+    }
+
+    override fun getHistoricExchangeRates(pair: Pair<String, String>): CurrencyRangeResponse {
+        val end = Instant.now().atZone(ZoneId.systemDefault())
+        val start = end.minusDays(4950)
+        logger.info("$pair: fetching rate history from $start to $end")
+        val response = client
+            .get()
+            .uri("https://api-fxtrade.oanda.com/v3/instruments/${pair.first}_${pair.second}/candles" +
+                    "?granularity=D&from=${start.toEpochSecond()}&to=${end.toEpochSecond()}")
+            .headers {
+                it.setBearerAuth(app.oandaToken)
+            }
+            .retrieve()
+            .toEntity(OandaResponse::class.java)
+
+        if (!response.statusCode.is2xxSuccessful || response.body == null) {
+            throw Error("Could not get exchange rate for ${pair.first}/${pair.second}")
+        }
+
+        logger.info { "$pair: retrieved ${response.body!!.candles.size} days of rate history"}
+        return CurrencyRangeResponse(
+            meta = CurrencyResponseMeta(
+                generatedBy = "oanda-range",
+                generatedAt = Instant.now(),
+                dateOfRate = Instant.now()
+            ),
+            rates = response.body!!.candles.associate { it -> Pair(it.time, it.mid.close) }
         )
     }
 }

@@ -1,14 +1,9 @@
 package com.jacksonrakena.mixer.controller
 
-import com.fasterxml.jackson.annotation.JsonFormat
-import com.fasterxml.jackson.databind.PropertyNamingStrategy
-import com.fasterxml.jackson.databind.annotation.JsonNaming
 import com.jacksonrakena.mixer.cache.RateCache
+import com.jacksonrakena.mixer.upstream.CurrencyRangeResponse
 import com.jacksonrakena.mixer.upstream.CurrencyResponse
-import com.jacksonrakena.mixer.upstream.CurrencyResponseMeta
 import com.jacksonrakena.mixer.upstream.CurrencyService
-import com.jacksonrakena.mixer.upstream.oanda.OandaCurrencyService
-import org.springframework.stereotype.Controller
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -16,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
-import java.util.*
+import java.time.ZoneOffset
 import java.util.logging.Logger
 
 @RestController
@@ -28,44 +23,54 @@ class CurrencyController(val currencyService: CurrencyService, val rateCache: Ra
 
     @GetMapping("/{base}/{target}")
     fun getExchangeRate(@PathVariable base: String, @PathVariable target: String): CurrencyResponse {
-        val pair = Pair(base, target)
-        val cachedRate = rateCache.rateCache[pair]
-        if (cachedRate != null) {
-            logger.info {
-                "Returning cached rate for $pair: ${cachedRate.rate}"
-            }
-            return cachedRate
-        }
-        return CurrencyResponse(
-            meta = CurrencyResponseMeta(
-                generatedAt = Instant.now(),
-                generatedBy = "error"
-            ),
-            rate = null
-        )
+        return rateCache.findRateOnDay(Pair(base, target), Instant.now())
     }
 
-    @PostMapping("/bulk")
-    fun getBulkExchangeRates(@RequestBody request: BulkExchangeRateRequest): BulkExchangeRateResponse {
-        val response = mutableMapOf<String, MutableMap<String, Double>>()
-        for (rate in request.rates) {
-             val cachedRate = rateCache.rateCache[Pair(rate.base, rate.target)]
-             if (cachedRate != null) {
-                 response[rate.base] = (response[rate.base] ?: mutableMapOf())
-                 response[rate.base]!![rate.target] = cachedRate.rate!!
-             }
+    @GetMapping("/{base}/{target}/{date}")
+    fun getExchangeRateAtDate(
+        @PathVariable base: String,
+        @PathVariable target: String,
+        @PathVariable date: Instant): CurrencyResponse {
+        return rateCache.findRateOnDay(Pair(base, target), date)
+    }
+
+    @PostMapping("/query")
+    fun queryExchangeRates(@RequestBody request: QueryExchangeRatesRequest): QueryExchangeRatesResponse {
+        val response = mutableMapOf<Instant, MutableMap<String, MutableMap<String, Double>>>()
+        val end = request.endDate ?: Instant.now()
+        val start = request.startDate ?: Instant.now().atZone(ZoneOffset.UTC).minusDays(4900).toInstant()
+
+        for (pair in request.instruments) {
+            val query = rateCache.queryRatesOverTime(
+                Pair(pair.base, pair.target),
+                start,
+                end
+            )
+
+            for ((date, rate) in query) {
+                response[date] = response[date] ?: mutableMapOf()
+
+                response[date]!![pair.base] = response[date]!![pair.base] ?: mutableMapOf()
+                response[date]!![pair.base]!![pair.target] = rate
+
+                response[date]!![pair.target] = response[date]!![pair.target] ?: mutableMapOf()
+                response[date]!![pair.target]!![pair.base] = rate
+            }
+
         }
-        return BulkExchangeRateResponse(
+        return QueryExchangeRatesResponse(
             rates = response
         )
     }
 }
 
 data class ExchangeRateInstrument(val base: String, val target: String)
-data class BulkExchangeRateRequest(
-    val rates: List<ExchangeRateInstrument>
+data class QueryExchangeRatesRequest(
+    val instruments: List<ExchangeRateInstrument>,
+    val startDate: Instant?,
+    val endDate: Instant?
 )
 
-data class BulkExchangeRateResponse(
-    val rates: Map<String, Map<String, Double>>
+data class QueryExchangeRatesResponse(
+    val rates: Map<Instant, Map<String, Map<String, Double>>>
 )
