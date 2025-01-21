@@ -42,7 +42,6 @@ class OandaCurrencyService(val app: MixerApplication, val client: RestClient) : 
         val logger = Logger.getLogger(OandaCurrencyService::class.java.name)
     }
 
-    @Cacheable("oanda-fx")
     override fun getExchangeRate(base: String, pair: String): CurrencyResponse {
         logger.info("Fetching exchange rate for $base/$pair")
         val response = client
