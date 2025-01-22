@@ -3,10 +3,12 @@ package com.jacksonrakena.mixer.upstream.oanda
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.annotation.JsonNaming
 import com.jacksonrakena.mixer.MixerApplication
+import com.jacksonrakena.mixer.MixerConfiguration
 import com.jacksonrakena.mixer.upstream.CurrencyRangeResponse
 import com.jacksonrakena.mixer.upstream.CurrencyResponse
 import com.jacksonrakena.mixer.upstream.CurrencyResponseMeta
 import com.jacksonrakena.mixer.upstream.CurrencyService
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.cache.annotation.Cacheable
 import org.springframework.http.HttpStatusCode
 import org.springframework.stereotype.Component
@@ -39,7 +41,8 @@ data class CandlestickValue (
 )
 
 @Component
-class OandaCurrencyService(val app: MixerApplication, val client: RestClient) : CurrencyService {
+@ConditionalOnProperty("mixer.currency.provider", havingValue = "oanda")
+class OandaCurrencyService(val app: MixerApplication, val client: RestClient, val config: MixerConfiguration): CurrencyService {
    companion object {
         val logger = Logger.getLogger(OandaCurrencyService::class.java.name)
     }
@@ -50,7 +53,7 @@ class OandaCurrencyService(val app: MixerApplication, val client: RestClient) : 
             .get()
             .uri("https://api-fxtrade.oanda.com/v3/instruments/${base}_$pair/candles")
             .headers {
-                it.setBearerAuth(app.oandaToken)
+                it.setBearerAuth(config.currency.token)
             }
             .retrieve()
             .toEntity(OandaResponse::class.java)
@@ -80,7 +83,7 @@ class OandaCurrencyService(val app: MixerApplication, val client: RestClient) : 
             .uri("https://api-fxtrade.oanda.com/v3/instruments/${pair.first}_${pair.second}/candles" +
                     "?granularity=D&from=${start.toEpochSecond()}&to=${end.toEpochSecond()}")
             .headers {
-                it.setBearerAuth(app.oandaToken)
+                it.setBearerAuth(config.currency.token)
             }
             .retrieve()
             .toEntity(OandaResponse::class.java)
