@@ -34,6 +34,7 @@ class CurrencyController(val currencyService: CurrencyService, val rateCache: Ra
         return rateCache.findRateOnDay(Pair(base, target), date)
     }
 
+
     @PostMapping("/query")
     fun queryExchangeRates(@RequestBody request: QueryExchangeRatesRequest): QueryExchangeRatesResponse {
         val response = mutableMapOf<Instant, MutableMap<String, MutableMap<String, Double>>>()
@@ -54,7 +55,7 @@ class CurrencyController(val currencyService: CurrencyService, val rateCache: Ra
                 response[date]!![pair.base]!![pair.target] = rate
 
                 response[date]!![pair.target] = response[date]!![pair.target] ?: mutableMapOf()
-                response[date]!![pair.target]!![pair.base] = rate
+                response[date]!![pair.target]!![pair.base] = 1.0/rate
             }
 
         }
