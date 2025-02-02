@@ -7,10 +7,8 @@ import com.jacksonrakena.mixer.upstream.CurrencyService
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.Instant
-import java.util.concurrent.ConcurrentHashMap
 import java.util.logging.Level
 import java.util.logging.Logger
-import kotlin.math.log
 
 @Component
 class RateCache(val currencyService: CurrencyService) {
@@ -103,7 +101,7 @@ class RateCache(val currencyService: CurrencyService) {
                 )
 
                 rateCache[Pair(pair.second, pair.first)] = rate.copy(
-                    meta =  rate.meta.copy(
+                    meta = rate.meta.copy(
                         generatedBy = "cached-" + rate.meta.generatedBy
                     ),
                     rates = rate.rates.mapValues { (key, value) -> 1.0/value }
