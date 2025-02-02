@@ -1,7 +1,6 @@
 package com.jacksonrakena.mixer.upstream.oanda
 
 import com.fasterxml.jackson.annotation.JsonProperty
-import com.fasterxml.jackson.databind.annotation.JsonNaming
 import com.jacksonrakena.mixer.MixerApplication
 import com.jacksonrakena.mixer.MixerConfiguration
 import com.jacksonrakena.mixer.upstream.CurrencyRangeResponse
@@ -9,8 +8,6 @@ import com.jacksonrakena.mixer.upstream.CurrencyResponse
 import com.jacksonrakena.mixer.upstream.CurrencyResponseMeta
 import com.jacksonrakena.mixer.upstream.CurrencyService
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
-import org.springframework.cache.annotation.Cacheable
-import org.springframework.http.HttpStatusCode
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import java.time.Instant

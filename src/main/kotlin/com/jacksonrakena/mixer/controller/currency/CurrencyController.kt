@@ -1,15 +1,9 @@
-package com.jacksonrakena.mixer.controller
+package com.jacksonrakena.mixer.controller.currency
 
 import com.jacksonrakena.mixer.cache.RateCache
-import com.jacksonrakena.mixer.upstream.CurrencyRangeResponse
 import com.jacksonrakena.mixer.upstream.CurrencyResponse
 import com.jacksonrakena.mixer.upstream.CurrencyService
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.*
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.logging.Logger
@@ -30,10 +24,10 @@ class CurrencyController(val currencyService: CurrencyService, val rateCache: Ra
     fun getExchangeRateAtDate(
         @PathVariable base: String,
         @PathVariable target: String,
-        @PathVariable date: Instant): CurrencyResponse {
+        @PathVariable date: Instant
+    ): CurrencyResponse {
         return rateCache.findRateOnDay(Pair(base, target), date)
     }
-
 
     @PostMapping("/query")
     fun queryExchangeRates(@RequestBody request: QueryExchangeRatesRequest): QueryExchangeRatesResponse {
@@ -64,14 +58,3 @@ class CurrencyController(val currencyService: CurrencyService, val rateCache: Ra
         )
     }
 }
-
-data class ExchangeRateInstrument(val base: String, val target: String)
-data class QueryExchangeRatesRequest(
-    val instruments: List<ExchangeRateInstrument>,
-    val startDate: Instant?,
-    val endDate: Instant?
-)
-
-data class QueryExchangeRatesResponse(
-    val rates: Map<Instant, Map<String, Map<String, Double>>>
-)
