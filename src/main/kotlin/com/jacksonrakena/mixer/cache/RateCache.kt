@@ -4,14 +4,17 @@ import com.jacksonrakena.mixer.upstream.CurrencyRangeResponse
 import com.jacksonrakena.mixer.upstream.CurrencyResponse
 import com.jacksonrakena.mixer.upstream.CurrencyResponseMeta
 import com.jacksonrakena.mixer.upstream.CurrencyService
-import org.springframework.scheduling.annotation.Scheduled
+import jakarta.annotation.PostConstruct
+import org.jetbrains.exposed.v1.jdbc.Database
+import org.jobrunr.scheduling.JobRequestScheduler
 import org.springframework.stereotype.Component
 import java.time.Instant
-import java.util.logging.Level
 import java.util.logging.Logger
 
 @Component
-class RateCache(val currencyService: CurrencyService) {
+class RateCache(val currencyService: CurrencyService, val scheduler: JobRequestScheduler,
+                private val database: Database
+) {
     companion object {
         val logger = Logger.getLogger(RateCache::class.java.name)
 
@@ -43,7 +46,11 @@ class RateCache(val currencyService: CurrencyService) {
         if (closest == input) return@findClosest closest else return@fold closest
     }
 
-    fun queryRatesOverTime(pair: Pair<String, String>, from: Instant, to: Instant): Map<Instant, Double> {
+    fun queryTemporalBucketRate(
+        pair: Pair<String, String>,
+        from: Instant,
+        to: Instant
+    ): Map<Instant, Double> {
         if (to < from) throw Error("Cannot search rates backwards from $from to $to")
         val ratesForPair = rateCache[pair] ?: return mapOf()
         val sortedRates = ratesForPair.rates.toSortedMap()
@@ -63,6 +70,7 @@ class RateCache(val currencyService: CurrencyService) {
                     dateOfRate = Instant.now()
                 ),
                 rate = null
+
             )
         val closestKey = ratesForPair.rates.toSortedMap().keys.findClosest(day)
         if (closestKey == null) {
@@ -86,31 +94,25 @@ class RateCache(val currencyService: CurrencyService) {
         )
     }
 
-    @Scheduled(fixedDelay = 60_000 * 60, initialDelay = 1_000)
+    fun insertSeedData() {
+
+    }
+
+//    @Scheduled(fixedDelay = 60_000 * 60, initialDelay = 1_000)
+    @PostConstruct
     fun updateAllCachedRates() {
         logger.info("Updating all cached rates")
 
         for (pair in SUPPORTED_PAIRS) {
-            try {
-                val rate = currencyService.getHistoricExchangeRates(pair)
-
-                rateCache[pair] = rate.copy(
-                    meta = rate.meta.copy(
-                        generatedBy = "cached-" + rate.meta.generatedBy
-                    )
+            val jobId = scheduler.enqueue(
+                BackfillCurrencyPairRequest(
+                    base = pair.first,
+                    counter = pair.second,
                 )
-
-                rateCache[Pair(pair.second, pair.first)] = rate.copy(
-                    meta = rate.meta.copy(
-                        generatedBy = "cached-" + rate.meta.generatedBy
-                    ),
-                    rates = rate.rates.mapValues { (key, value) -> 1.0/value }
-                )
-            } catch (e: Error) {
-                logger.log(Level.SEVERE, e) {
-                    "failed to fetch currency pair ${pair.first}/${pair.second}"
-                }
-            }
+            )
+            logger.info("Scheduled backfill job ${jobId} for ${pair.first}/${pair.second}")
         }
+//    InsertSeedDataRequestHandler(database, currencyService).run(InsertSeedDataRequest())
+        scheduler.enqueue(InsertSeedDataRequest())
     }
 }

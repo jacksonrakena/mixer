@@ -9,7 +9,12 @@ import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.ExampleObject
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
-import org.springframework.web.bind.annotation.*
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.logging.Logger
@@ -28,7 +33,8 @@ class CurrencyController(val currencyService: CurrencyService, val rateCache: Ra
     @GetMapping("/{base}/{target}")
     fun getExchangeRate(
         @PathVariable @Parameter(description = "The base currency code.") base: String,
-        @PathVariable @Parameter(description = "The currency to compare against.") target: String): CurrencyResponse {
+        @PathVariable @Parameter(description = "The currency to compare against.") target: String
+    ): CurrencyResponse {
         return rateCache.findRateOnDay(Pair(base, target), Instant.now())
     }
 
@@ -51,13 +57,13 @@ class CurrencyController(val currencyService: CurrencyService, val rateCache: Ra
     )
     @ApiResponses(
         *[
-        ApiResponse(
+            ApiResponse(
                 responseCode = "200",
                 description = "Successful query",
                 content = [Content(
-                        mediaType = "application/json",
-                        examples = [ExampleObject(
-                            """
+                    mediaType = "application/json",
+                    examples = [ExampleObject(
+                        """
                                 {
                                   "rates": {
                                     "2011-09-03T21:00:00Z": {
@@ -75,10 +81,11 @@ class CurrencyController(val currencyService: CurrencyService, val rateCache: Ra
                                   }
                                 }
                             """
-                        )]
+                    )]
                 )]
-        ),
-    ])
+            ),
+        ]
+    )
     @PostMapping("/query")
     fun queryExchangeRates(@RequestBody request: QueryExchangeRatesRequest): QueryExchangeRatesResponse {
         val response = mutableMapOf<Instant, MutableMap<String, MutableMap<String, Double>>>()
@@ -86,7 +93,7 @@ class CurrencyController(val currencyService: CurrencyService, val rateCache: Ra
         val start = request.startDate ?: Instant.now().atZone(ZoneOffset.UTC).minusDays(4900).toInstant()
 
         for (pair in request.instruments) {
-            val query = rateCache.queryRatesOverTime(
+            val query = rateCache.queryTemporalBucketRate(
                 Pair(pair.base, pair.target),
                 start,
                 end
@@ -99,7 +106,7 @@ class CurrencyController(val currencyService: CurrencyService, val rateCache: Ra
                 response[date]!![pair.base]!![pair.target] = rate
 
                 response[date]!![pair.target] = response[date]!![pair.target] ?: mutableMapOf()
-                response[date]!![pair.target]!![pair.base] = 1.0/rate
+                response[date]!![pair.target]!![pair.base] = 1.0 / rate
             }
 
         }

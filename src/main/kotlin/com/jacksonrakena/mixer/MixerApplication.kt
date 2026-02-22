@@ -3,11 +3,17 @@ package com.jacksonrakena.mixer
 import io.swagger.v3.oas.annotations.OpenAPIDefinition
 import io.swagger.v3.oas.annotations.info.Contact
 import io.swagger.v3.oas.annotations.info.Info
+import org.jetbrains.exposed.v1.jdbc.Database
+import org.jobrunr.jobs.mappers.JobMapper
+import org.jobrunr.storage.InMemoryStorageProvider
+import org.jobrunr.storage.StorageProvider
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.runApplication
 import org.springframework.cache.annotation.EnableCaching
+import org.springframework.context.annotation.Bean
 import org.springframework.scheduling.annotation.EnableScheduling
+
 
 @EnableCaching
 @SpringBootApplication
@@ -23,7 +29,17 @@ import org.springframework.scheduling.annotation.EnableScheduling
         )
     )
 )
-class MixerApplication
+class MixerApplication {
+    @Bean
+    fun storageProvider(jobMapper: JobMapper): StorageProvider {
+        return InMemoryStorageProvider().also { it.setJobMapper(jobMapper) }
+    }
+
+    @Bean
+    fun database(): Database {
+        return Database.connect("jdbc:h2:mem:test", driver = "org.h2.Driver")
+    }
+}
 
 fun main(args: Array<String>) {
     runApplication<MixerApplication>(*args)

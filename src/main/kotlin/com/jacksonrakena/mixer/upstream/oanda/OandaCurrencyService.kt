@@ -19,11 +19,13 @@ data class OandaResponse(
     val granularity: String,
     val candles: List<Candlestick>
 )
+
 data class Candlestick(
     val time: Instant,
     val mid: CandlestickValue
 )
-data class CandlestickValue (
+
+data class CandlestickValue(
     @JsonProperty("h")
     val high: Double,
 
@@ -39,13 +41,16 @@ data class CandlestickValue (
 
 @Component
 @ConditionalOnProperty("mixer.currency.provider", havingValue = "oanda")
-class OandaCurrencyService(val app: MixerApplication, val client: RestClient, val config: MixerConfiguration): CurrencyService {
-   companion object {
+class OandaCurrencyService(val app: MixerApplication, val client: RestClient, val config: MixerConfiguration) :
+    CurrencyService {
+    companion object {
         val logger = Logger.getLogger(OandaCurrencyService::class.java.name)
     }
 
+
     override fun getExchangeRate(base: String, pair: String): CurrencyResponse {
         logger.info("Fetching exchange rate for $base/$pair")
+
         val response = client
             .get()
             .uri("https://api-fxtrade.oanda.com/v3/instruments/${base}_$pair/candles")
@@ -77,8 +82,10 @@ class OandaCurrencyService(val app: MixerApplication, val client: RestClient, va
         logger.info("$pair: fetching rate history from $start to $end")
         val response = client
             .get()
-            .uri("https://api-fxtrade.oanda.com/v3/instruments/${pair.first}_${pair.second}/candles" +
-                    "?granularity=D&from=${start.toEpochSecond()}&to=${end.toEpochSecond()}")
+            .uri(
+                "https://api-fxtrade.oanda.com/v3/instruments/${pair.first}_${pair.second}/candles" +
+                        "?granularity=D&from=${start.toEpochSecond()}&to=${end.toEpochSecond()}"
+            )
             .headers {
                 it.setBearerAuth(config.currency.token)
             }
@@ -89,7 +96,7 @@ class OandaCurrencyService(val app: MixerApplication, val client: RestClient, va
             throw Error("Could not get exchange rate for ${pair.first}/${pair.second}")
         }
 
-        logger.info { "$pair: retrieved ${response.body!!.candles.size} days of rate history"}
+//        logger.info { "$pair: retrieved ${response.body!!.candles.size} days of rate history" }
         return CurrencyRangeResponse(
             meta = CurrencyResponseMeta(
                 generatedBy = "oanda-range",

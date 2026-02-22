@@ -1,11 +1,11 @@
 import org.springframework.boot.gradle.tasks.bundling.BootBuildImage
 
 plugins {
-    kotlin("jvm") version "1.9.25"
-    kotlin("plugin.spring") version "1.9.25"
-    id("org.springframework.boot") version "3.4.1"
-    id("io.spring.dependency-management") version "1.1.7"
-    id("org.asciidoctor.jvm.convert") version "3.3.2"
+    kotlin("jvm")
+    kotlin("plugin.spring")
+    kotlin("plugin.serialization")
+    id("org.springframework.boot")
+    id("io.spring.dependency-management")
 }
 
 group = "com.jacksonrakena"
@@ -17,12 +17,6 @@ java {
     }
 }
 
-configurations {
-    compileOnly {
-        extendsFrom(configurations.annotationProcessor.get())
-    }
-}
-
 repositories {
     mavenCentral()
 }
@@ -30,24 +24,34 @@ repositories {
 extra["snippetsDir"] = file("build/generated-snippets")
 
 dependencies {
-    implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("org.springframework.boot:spring-boot-starter-cache")
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.4")
-    implementation("org.jetbrains.kotlin:kotlin-reflect")
-    developmentOnly("org.springframework.boot:spring-boot-devtools")
-    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
-    annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
-    testImplementation("org.springframework.restdocs:spring-restdocs-mockmvc")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    implementation(Spring.boot.actuator)
+    implementation(Spring.boot.cache)
+    implementation(Spring.boot.web)
+    implementation("org.jetbrains.exposed:exposed-spring-boot4-starter:_")
+    implementation(JetBrains.exposed.core)
+    implementation("org.springframework.boot:spring-boot-starter-kotlinx-serialization-json:_")
+    implementation(JetBrains.exposed.jdbc)
+    implementation(KotlinX.serialization.json)
+    implementation("com.h2database:h2:_")
+    implementation("org.jobrunr:jobrunr-spring-boot-4-starter:_")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:_")
+    implementation("org.jetbrains.kotlin:kotlin-reflect:_")
+    implementation("org.jetbrains.exposed:exposed-kotlin-datetime:_")
+    developmentOnly(Spring.boot.devTools)
+    annotationProcessor(Spring.boot.configurationProcessor)
+    implementation("org.jobrunr:jobrunr-kotlin-2.2-support:_")
+    testImplementation(Spring.boot.test)
+    testImplementation(Kotlin.test.junit5)
+    testImplementation("org.springframework.restdocs:spring-restdocs-mockmvc:_")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:_")
+    testImplementation(KotlinX.coroutines.test)
+    testImplementation(Testing.kotest.assertions.core)
 }
 
 kotlin {
     compilerOptions {
-        freeCompilerArgs.addAll("-Xjsr305=strict")
+        freeCompilerArgs.addAll("-Xjsr305=strict",
+            "-opt-in=kotlin.uuid.ExperimentalUuidApi")
     }
 }
 
@@ -57,11 +61,6 @@ tasks.withType<Test> {
 
 tasks.test {
     outputs.dir(project.extra["snippetsDir"]!!)
-}
-
-tasks.asciidoctor {
-    inputs.dir(project.extra["snippetsDir"]!!)
-    dependsOn(tasks.test)
 }
 
 tasks.named<BootBuildImage>("bootBuildImage") {
