@@ -1,193 +1,355 @@
-import { useEffect, useState } from "react";
-import { Box, CircularProgress, Alert } from "@mui/material";
-import {
-  ChartsTooltip,
-  ChartsTooltipContainer,
-  LineChart,
-  useAxesTooltip,
-  useAxisTooltip,
-  useItemTooltip,
-} from "@mui/x-charts";
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
+import Box from '@mui/joy/Box'
+import Typography from '@mui/joy/Typography'
+import CircularProgress from '@mui/joy/CircularProgress'
+import Alert from '@mui/joy/Alert'
+import Card from '@mui/joy/Card'
+import CardContent from '@mui/joy/CardContent'
+import Chip from '@mui/joy/Chip'
+import { LineChart } from '@mui/x-charts/LineChart'
+import { fetchAggregation, daysAgo, today, type AssetAggregation } from './api'
 
-interface AssetData {
-  assetId: string;
-  date: string;
-  amount: number;
-  amountDeltaCapitalGains: number;
-  amountDeltaTrades: number;
-  amountDeltaReconciliation: number;
-  amountDeltaOther: number;
-  value: number;
-  valueDeltaCapitalGains: number;
-  valueDeltaTrades: number;
-  valueDeltaReconciliation: number;
-  valueDeltaOther: number;
+interface AssetChartProps {
+  assetId: string
+  assetName: string
+  currency: string
 }
 
-interface ChartDataPoint {
-  date: string;
-  value: number;
-  originalData: AssetData;
+type DateRange = '7d' | '30d' | '90d' | '1y' | 'all'
+
+// Must match LineChart's internal default margins
+const CHART_MARGIN = { left: 60, right: 10, top: 10, bottom: 30 }
+
+const DATE_RANGES: { label: string; value: DateRange; days: number }[] = [
+  { label: '7D', value: '7d', days: 7 },
+  { label: '30D', value: '30d', days: 30 },
+  { label: '90D', value: '90d', days: 90 },
+  { label: '1Y', value: '1y', days: 365 },
+  { label: 'All', value: 'all', days: 3650 },
+]
+
+function deltaColor(value: number): string {
+  if (value > 0) return '#34d399'
+  if (value < 0) return '#f87171'
+  return 'rgba(255,255,255,0.4)'
 }
 
-const CustomTooltip = (vdat) => {
-  const axis = useAxesTooltip({
-    directions: ["x"],
-  });
-  if (axis == null)
-    return <ChartsTooltipContainer>nuffin</ChartsTooltipContainer>;
-  //   const data = axis[0];
-  const original = axis[0].seriesItems[0].formattedValue
-    .originalData as AssetData;
-  console.log(original);
-  //   return (
-  //     <ChartsTooltipContainer>{JSON.stringify(original)}</ChartsTooltipContainer>
-  //   );
-
-  const reasons = [];
-  if (original.amountDeltaCapitalGains !== 0) {
-    reasons.push(
-      `Capital Gains: ${original.amountDeltaCapitalGains?.toFixed(2)}`,
-    );
-  }
-  if (original.amountDeltaTrades !== 0) {
-    reasons.push(`Trades: ${original.amountDeltaTrades?.toFixed(2)}`);
-  }
-  if (original.amountDeltaReconciliation !== 0) {
-    reasons.push(
-      `Reconciliation: ${original.amountDeltaReconciliation?.toFixed(2)}`,
-    );
-  }
-  if (original.amountDeltaOther !== 0) {
-    reasons.push(`Other: ${original.amountDeltaOther?.toFixed(2)}`);
+/**
+ * Fill in missing dates across [startIso, endIso]. Missing days carry forward
+ * the last known value with all deltas = 0.
+ */
+function fillDateRange(
+  data: AssetAggregation[],
+  startIso: string,
+  endIso: string,
+): AssetAggregation[] {
+  const byDate = new Map<string, AssetAggregation>()
+  for (const d of data) {
+    byDate.set(d.date.slice(0, 10), d)
   }
 
-  return (
-    <ChartsTooltipContainer>
-      <Box
-        sx={{
-          backgroundColor: "rgba(0, 0, 0, 0.9)",
-          padding: "8px 12px",
-          borderRadius: "4px",
-          color: "#fff",
-          fontSize: "12px",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: "4px" }}>
-          {new Date(original.date).toLocaleDateString()}
-        </div>
-        <div style={{ marginBottom: "4px" }}>
-          Value: {original.value?.toFixed(2)}
-        </div>
-        {reasons.length > 0 ? (
-          <div>
-            <div style={{ marginBottom: "4px" }}>Reasons:</div>
-            {reasons.map((reason, idx) => (
-              <div key={idx} style={{ fontSize: "11px" }}>
-                • {reason}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div>No changes</div>
-        )}
-      </Box>
-    </ChartsTooltipContainer>
-  );
-};
+  const result: AssetAggregation[] = []
+  const cursor = new Date(startIso + 'T00:00:00Z')
+  const end = new Date(endIso + 'T00:00:00Z')
+  let lastValue = data.length > 0 ? data[0].value : 0
 
-export const AssetChart = () => {
-  const [data, setData] = useState<ChartDataPoint[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  while (cursor <= end) {
+    const key = cursor.toISOString().slice(0, 10)
+    const existing = byDate.get(key)
+    if (existing) {
+      lastValue = existing.value
+      result.push(existing)
+    } else {
+      result.push({
+        assetId: data[0]?.assetId ?? '',
+        date: cursor.toISOString(),
+        amount: lastValue,
+        amountDeltaCapitalGains: 0,
+        amountDeltaTrades: 0,
+        amountDeltaReconciliation: 0,
+        amountDeltaOther: 0,
+        value: lastValue,
+        valueDeltaCapitalGains: 0,
+        valueDeltaTrades: 0,
+        valueDeltaReconciliation: 0,
+        valueDeltaOther: 0,
+      })
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  }
+  return result
+}
+
+interface TooltipState {
+  x: number
+  y: number
+  dataIndex: number
+}
+
+const CHART_HEIGHT = 300
+
+export const AssetChart = ({ assetId, assetName, currency }: AssetChartProps) => {
+  const [data, setData] = useState<AssetAggregation[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [range, setRange] = useState<DateRange>('30d')
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const assetId = "6c942179-c993-4b25-86dd-6346fb0e3005";
-        const startDate = "2026-02-01";
-        const endDate = "2026-02-21";
+    if (!assetId) return
+    const days = DATE_RANGES.find((r) => r.value === range)?.days ?? 30
+    const start = daysAgo(days)
+    const end = today()
 
-        const response = await fetch(
-          `http://localhost:8080/agg/asset/${assetId}/${startDate}/${endDate}`,
-        );
+    setLoading(true)
+    setError(null)
+    setTooltip(null)
+    fetchAggregation(assetId, start, end)
+      .then((d) => {
+        const sorted = [...d].sort(
+          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+        )
+        setData(fillDateRange(sorted, start, end))
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to fetch data'))
+      .finally(() => setLoading(false))
+  }, [assetId, range])
 
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
-        }
+  const currentValue = data.length > 0 ? data[data.length - 1].value : null
+  const firstValue = data.length > 0 ? data[0].value : null
+  const change =
+    currentValue !== null && firstValue !== null && firstValue !== 0
+      ? ((currentValue - firstValue) / firstValue) * 100
+      : null
+  const isPositive = change !== null && change >= 0
 
-        const assetData: AssetData[] = await response.json();
+  const xValues = useMemo(() => data.map((d) => new Date(d.date).getTime()), [data])
+  const yValues = useMemo(() => data.map((d) => d.value), [data])
 
-        const chartData: ChartDataPoint[] = assetData.map((item) => ({
-          date: item.date,
-          value: item.value,
-          originalData: item,
-        }));
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (!rect || xValues.length === 0) return
 
-        setData(chartData);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch data");
-        setData([]);
-      } finally {
-        setLoading(false);
+      const mouseX = e.clientX - rect.left
+      const mouseY = e.clientY - rect.top
+
+      // Map pixel x to data index: linear interpolation across the plot area
+      const plotLeft = CHART_MARGIN.left
+      const plotRight = rect.width - CHART_MARGIN.right
+      const plotWidth = plotRight - plotLeft
+
+      if (mouseX < plotLeft || mouseX > plotRight) {
+        setTooltip(null)
+        return
       }
-    };
 
-    fetchData();
-  }, []);
+      const fraction = (mouseX - plotLeft) / plotWidth
+      const rawIndex = fraction * (xValues.length - 1)
+      const dataIndex = Math.max(0, Math.min(xValues.length - 1, Math.round(rawIndex)))
 
-  if (loading) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="400px"
-      >
-        <CircularProgress />
-      </Box>
-    );
-  }
+      setTooltip({ x: mouseX, y: mouseY, dataIndex })
+    },
+    [xValues],
+  )
 
-  if (error) {
-    return <Alert severity="error">Error loading chart: {error}</Alert>;
-  }
+  const handleMouseLeave = useCallback(() => {
+    setTooltip(null)
+  }, [])
 
-  if (data.length === 0) {
-    return <Alert severity="info">No data available</Alert>;
-  }
+  // Tooltip data point
+  const tooltipPoint =
+    tooltip && tooltip.dataIndex >= 0 && tooltip.dataIndex < data.length
+      ? data[tooltip.dataIndex]
+      : null
+
+  const deltas = tooltipPoint
+    ? [
+        { label: 'Trades', value: tooltipPoint.amountDeltaTrades },
+        { label: 'Reconciliation', value: tooltipPoint.amountDeltaReconciliation },
+        { label: 'Capital Gains', value: tooltipPoint.amountDeltaCapitalGains },
+        { label: 'Other', value: tooltipPoint.amountDeltaOther },
+      ].filter((d) => d.value !== 0)
+    : []
 
   return (
-    <Box sx={{ width: "100%", height: "500px", padding: "20px" }}>
-      <h2>Asset Value Over Time</h2>
-      <LineChart
-        // dataset={data}
-        dataset={data}
-        series={[
-          {
-            dataKey: "value",
-            valueFormatter: (code, context) => {
-              return data[context.dataIndex];
-            },
-            // data: data.map((e) => ({ date: e.date, value: e.value })),
-            data: data.map((e) => e.value),
-            label: "Asset value2",
-          },
-        ]}
-        // xAxis={[{ scaleType: "point", data: data.map((e) => e.date) }]}
-        // yAxis={[
-        //   { id: "leftAxisId", width: 50 },
-        //   { id: "rightAxisId", position: "right" },
-        // ]}
-        slots={{ tooltip: CustomTooltip }}
-        slotProps={{
-          tooltip: {
-            trigger: "item",
-          },
-        }}
-      />
-    </Box>
-  );
-};
+    <Card
+      variant="outlined"
+      sx={{
+        background: 'rgba(17,24,39,0.6)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        borderRadius: '16px',
+        backdropFilter: 'blur(12px)',
+      }}
+    >
+      <CardContent>
+        {/* Header */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+          <Box>
+            <Typography level="title-lg" sx={{ color: 'white', fontWeight: 700 }}>
+              {assetName}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+              {currentValue !== null && (
+                <Typography level="h3" sx={{ color: 'white', fontWeight: 800 }}>
+                  {currentValue.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                  <Typography component="span" level="body-sm" sx={{ color: 'neutral.400', ml: 0.5 }}>
+                    {currency}
+                  </Typography>
+                </Typography>
+              )}
+              {change !== null && (
+                <Chip
+                  size="sm"
+                  sx={{
+                    background: isPositive ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)',
+                    color: isPositive ? '#34d399' : '#f87171',
+                    border: 'none',
+                    fontWeight: 600,
+                  }}
+                >
+                  {isPositive ? '+' : ''}{change.toFixed(2)}%
+                </Chip>
+              )}
+            </Box>
+          </Box>
+
+          {/* Range selector */}
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            {DATE_RANGES.map((r) => (
+              <Box
+                key={r.value}
+                onClick={() => setRange(r.value)}
+                sx={{
+                  px: 1.5, py: 0.5,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  transition: 'all 0.15s',
+                  background: range === r.value ? 'rgba(99,102,241,0.25)' : 'transparent',
+                  color: range === r.value ? '#818cf8' : 'rgba(255,255,255,0.4)',
+                  '&:hover': { background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' },
+                }}
+              >
+                {r.label}
+              </Box>
+            ))}
+          </Box>
+        </Box>
+
+        {/* Chart body */}
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: CHART_HEIGHT }}>
+            <CircularProgress size="md" />
+          </Box>
+        ) : error ? (
+          <Alert color="danger" sx={{ borderRadius: '10px' }}>{error}</Alert>
+        ) : data.length === 0 ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: CHART_HEIGHT }}>
+            <Typography level="body-sm" sx={{ color: 'neutral.500' }}>
+              No aggregation data yet. Add transactions to generate data.
+            </Typography>
+          </Box>
+        ) : (
+          <Box
+            ref={containerRef}
+            sx={{ position: 'relative' }}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          >
+            <LineChart
+              height={CHART_HEIGHT}
+              series={[
+                {
+                  data: yValues,
+                  label: assetName,
+                  color: '#818cf8',
+                  showMark: false,
+                  area: true,
+                },
+              ]}
+              xAxis={[
+                {
+                  data: xValues,
+                  scaleType: 'time',
+                  valueFormatter: (v) =>
+                    new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                },
+              ]}
+              yAxis={[{ width: 60 }]}
+              slotProps={{ tooltip: { trigger: 'none' } }}
+              sx={{
+                '& .MuiLineElement-root': { strokeWidth: 2 },
+                '& .MuiAreaElement-root': { fillOpacity: 0.12 },
+                '& .MuiChartsAxis-line, & .MuiChartsAxis-tick': { stroke: 'rgba(255,255,255,0.1)' },
+                '& .MuiChartsAxis-tickLabel': { fill: 'rgba(255,255,255,0.4)', fontSize: '11px' },
+                '& .MuiChartsAxis-label': { fill: 'rgba(255,255,255,0.4)' },
+              }}
+            />
+
+            {/* Custom tooltip overlay */}
+            {tooltip && tooltipPoint && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  left: tooltip.x + 16,
+                  top: Math.max(8, tooltip.y - 60),
+                  pointerEvents: 'none',
+                  zIndex: 50,
+                  background: 'rgba(10,14,26,0.97)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: '10px',
+                  padding: '12px 16px',
+                  minWidth: 200,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                  // keep tooltip on screen
+                  transform: tooltip.x > 200 ? 'translateX(-110%)' : 'none',
+                }}
+              >
+                <Typography level="body-xs" sx={{ color: 'rgba(255,255,255,0.4)', mb: 0.5 }}>
+                  {new Date(tooltipPoint.date).toLocaleDateString('en-US', {
+                    month: 'short', day: 'numeric', year: 'numeric',
+                  })}
+                </Typography>
+                <Typography
+                  level="title-md"
+                  sx={{ color: 'white', fontWeight: 700, mb: deltas.length > 0 ? 1.5 : 0 }}
+                >
+                  {tooltipPoint.value.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                </Typography>
+                {deltas.length > 0 && (
+                  <>
+                    <Typography
+                      level="body-xs"
+                      sx={{ color: 'rgba(255,255,255,0.25)', mb: 0.75, textTransform: 'uppercase', letterSpacing: '0.06em' }}
+                    >
+                      Changes
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                      {deltas.map((d) => (
+                        <Box
+                          key={d.label}
+                          sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 3 }}
+                        >
+                          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>{d.label}</span>
+                          <span style={{ color: deltaColor(d.value), fontWeight: 600, fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
+                            {d.value > 0 ? '+' : ''}{d.value.toFixed(4)}
+                          </span>
+                        </Box>
+                      ))}
+                    </Box>
+                  </>
+                )}
+                {deltas.length === 0 && (
+                  <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 12 }}>No changes this day</span>
+                )}
+              </Box>
+            )}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
