@@ -92,13 +92,13 @@ class AggregationServiceTests {
             )
 
             result shouldBe listOf(
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-12T12:59:00Z"), holding=10.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-13T12:59:00Z"), holding=9.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-14T12:59:00Z"), holding=11.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-15T12:59:00Z"), holding=11.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-16T12:59:00Z"), holding=11.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-17T12:59:00Z"), holding=13.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-18T12:59:00Z"), holding=13.0),
+                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-12T12:59:00Z"), amount=10.0),
+                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-13T12:59:00Z"), amount=9.0),
+                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-14T12:59:00Z"), amount=11.0),
+                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-15T12:59:00Z"), amount=11.0),
+                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-16T12:59:00Z"), amount=11.0),
+                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-17T12:59:00Z"), amount=13.0),
+                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-18T12:59:00Z"), amount=13.0),
             )
         }
 
@@ -151,37 +151,37 @@ class AggregationServiceTests {
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-12T12:59:00Z"),
-                    holding = 10.0
+                    amount = 10.0
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-13T12:59:00Z"),
-                    holding = 0.0
+                    amount = 0.0
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-14T12:59:00Z"),
-                    holding = 11.0
+                    amount = 11.0
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-15T12:59:00Z"),
-                    holding = 11.0
+                    amount = 11.0
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-16T12:59:00Z"),
-                    holding = 11.0
+                    amount = 11.0
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-17T12:59:00Z"),
-                    holding = 2.0
+                    amount = 2.0
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-18T12:59:00Z"),
-                    holding = 2.0
+                    amount = 2.0
                 )
             )
         }
@@ -242,37 +242,37 @@ class AggregationServiceTests {
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-12T12:59:00Z"),
-                    holding = 10.0
+                    amount = 10.0
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-13T12:59:00Z"),
-                    holding = 9.0
+                    amount = 9.0
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-14T12:59:00Z"),
-                    holding = 9.0
+                    amount = 9.0
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-15T12:59:00Z"),
-                    holding = 13.0
+                    amount = 13.0
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-16T12:59:00Z"),
-                    holding = 13.0
+                    amount = 13.0
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-17T12:59:00Z"),
-                    holding = 13.0
+                    amount = 13.0
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-18T12:59:00Z"),
-                    holding = 13.0
+                    amount = 13.0
                 )
             )
         }

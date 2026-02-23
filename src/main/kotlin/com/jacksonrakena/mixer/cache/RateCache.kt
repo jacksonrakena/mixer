@@ -1,5 +1,7 @@
 package com.jacksonrakena.mixer.cache
 
+import com.jacksonrakena.mixer.core.requests.BackfillCurrencyPairRequest
+import com.jacksonrakena.mixer.core.requests.InsertSeedDataRequest
 import com.jacksonrakena.mixer.upstream.CurrencyRangeResponse
 import com.jacksonrakena.mixer.upstream.CurrencyResponse
 import com.jacksonrakena.mixer.upstream.CurrencyResponseMeta

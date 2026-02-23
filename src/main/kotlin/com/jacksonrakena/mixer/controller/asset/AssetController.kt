@@ -1,18 +1,19 @@
-package com.jacksonrakena.mixer.data
+package com.jacksonrakena.mixer.controller.asset
 
-import com.jacksonrakena.mixer.cache.RecomputeAssetAggregationRequest
+import com.jacksonrakena.mixer.data.AssetTransactionType
+import com.jacksonrakena.mixer.data.tables.concrete.Asset
+import com.jacksonrakena.mixer.data.tables.concrete.Transaction
+import com.jacksonrakena.mixer.data.tables.virtual.AssetAggregate
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
-import org.jobrunr.scheduling.JobRequestScheduler
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -74,7 +75,6 @@ data class AssetDto(
 @RestController
 @RequestMapping("/asset")
 class AssetController(
-    val scheduler: JobRequestScheduler
 ) {
     companion object {
         val logger = Logger.getLogger(AssetController::class.java.name)
@@ -92,33 +92,6 @@ class AssetController(
                 )
             }
         }
-    }
-
-    @PutMapping("/{id}/transaction")
-    fun createTransaction(
-        @PathVariable id: UUID,
-        @RequestBody request: CreateTransactionRequest
-    ): CreateTransactionResponse {
-        val transactionId = transaction {
-            val insertedId = Transaction.insert {
-                it[assetId] = id.toKotlinUuid()
-                it[type] = request.type
-                it[amount] = request.amount
-                it[value] = request.value
-                it[timestamp] = request.timestamp.toEpochMilliseconds()
-            }[Transaction.id]
-
-            insertedId
-        }
-
-        val jobId = scheduler.enqueue(RecomputeAssetAggregationRequest(id.toKotlinUuid()))
-        logger.info("Scheduled RecomputeAssetAggregationRequest $jobId for asset $id after transaction $transactionId")
-
-        return CreateTransactionResponse(
-            transactionId = transactionId,
-            assetId = id.toKotlinUuid(),
-            jobId = jobId.asUUID().toKotlinUuid()
-        )
     }
 
     @PostMapping
@@ -158,28 +131,5 @@ class AssetController(
         logger.info("Deleted asset $assetId: $deleted")
 
         return DeleteAssetResponse(assetId = assetId, deleted = deleted)
-    }
-
-    @DeleteMapping("/{assetId}/transaction/{transactionId}")
-    fun deleteTransaction(
-        @PathVariable assetId: UUID,
-        @PathVariable transactionId: UUID
-    ): DeleteTransactionResponse {
-        val assetUuid = assetId.toKotlinUuid()
-        val transactionUuid = transactionId.toKotlinUuid()
-
-        val deleted = transaction {
-            Transaction.deleteWhere { Transaction.id eq transactionUuid } > 0
-        }
-
-        val jobId = scheduler.enqueue(RecomputeAssetAggregationRequest(assetUuid))
-        logger.info("Deleted transaction $transactionUuid, scheduled RecomputeAssetAggregationRequest $jobId for asset $assetUuid")
-
-        return DeleteTransactionResponse(
-            transactionId = transactionUuid,
-            assetId = assetUuid,
-            deleted = deleted,
-            jobId = jobId.asUUID().toKotlinUuid()
-        )
     }
 }

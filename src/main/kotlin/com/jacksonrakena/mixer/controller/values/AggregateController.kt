@@ -1,11 +1,10 @@
-package com.jacksonrakena.mixer.data
+package com.jacksonrakena.mixer.controller.values
 
-import com.jacksonrakena.mixer.cache.RateCache
-import com.jacksonrakena.mixer.upstream.CurrencyService
+import com.jacksonrakena.mixer.data.AggregationPeriod
+import com.jacksonrakena.mixer.data.AssetTransactionAggregation
+import com.jacksonrakena.mixer.data.tables.virtual.AssetAggregate
 import io.swagger.v3.oas.annotations.Operation
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atStartOfDayIn
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.greater
@@ -21,7 +20,7 @@ import kotlin.uuid.Uuid
 
 @RestController
 @RequestMapping("/agg")
-class AggregateController(val currencyService: CurrencyService, val rateCache: RateCache) {
+class AggregateController {
     companion object {
         val logger = Logger.getLogger(AggregateController::class.java.name)
     }
@@ -31,7 +30,7 @@ class AggregateController(val currencyService: CurrencyService, val rateCache: R
         description = "Gets the latest available FX rate for a currency pair.",
     )
     @GetMapping("/asset/{id}/{start}/{end}")
-    fun getExchangeRate(
+    fun getAggregateValue(
         @PathVariable id: String,
         @PathVariable start: String,
         @PathVariable end: String
@@ -44,18 +43,14 @@ class AggregateController(val currencyService: CurrencyService, val rateCache: R
                 .selectAll()
                 .where {
                     (AssetAggregate.assetId eq uuid) and
-                    (AssetAggregate.aggregationPeriod eq AggregationPeriod.DAILY) and
-                    (AssetAggregate.periodEndDate greater sdate) and
-                    (AssetAggregate.periodEndDate less edate)
+                            (AssetAggregate.aggregationPeriod eq AggregationPeriod.DAILY) and
+                            (AssetAggregate.periodEndDate greater sdate) and
+                            (AssetAggregate.periodEndDate less edate)
                 }
                 .toList()
         }
         return aggregates.map {
-            AssetTransactionAggregation(
-                it[AssetAggregate.assetId],
-                it[AssetAggregate.periodEndDate].atStartOfDayIn(TimeZone.currentSystemDefault()),
-                it[AssetAggregate.totalValue]
-            )
+            AssetTransactionAggregation.fromResultRow(it)
         }
     }
 }

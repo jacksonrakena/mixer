@@ -1,5 +1,9 @@
 package com.jacksonrakena.mixer.data
 
+import com.jacksonrakena.mixer.data.tables.concrete.Asset
+import com.jacksonrakena.mixer.data.tables.concrete.Transaction
+import com.jacksonrakena.mixer.data.tables.markets.ExchangeRate
+import com.jacksonrakena.mixer.data.tables.virtual.AssetAggregate
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
@@ -7,6 +11,7 @@ import kotlinx.datetime.atTime
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
@@ -21,24 +26,10 @@ import org.springframework.stereotype.Component
 import java.util.logging.Logger
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlin.time.toJavaInstant
+import kotlin.time.toKotlinInstant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
-
-interface AssetValueSource {
-    suspend fun getAssetValue(asset: Uuid, at: Instant): Double?
-}
-
-data class AggregationOutput(
-    val asset: Uuid,
-    val aggregationPeriod: AggregationPeriod,
-    val periodEndDate: Instant,
-    val totalValue: Double
-)
-
-data class Asset2(
-    val id: Uuid,
-    val name: String
-)
 
 enum class AggregationPeriod(val lookbackPeriodDays: Int) {
     DAILY(1),
@@ -66,8 +57,34 @@ data class AssetTransaction(
 data class AssetTransactionAggregation(
     val assetId: Uuid,
     val date: Instant,
-    val holding: Double
-)
+
+    val amount: Double,
+    val amountDeltaCapitalGains: Double = 0.0,
+    val amountDeltaTrades: Double = 0.0,
+    val amountDeltaReconciliation: Double = 0.0,
+    val amountDeltaOther: Double = 0.0,
+
+    val value: Double = 0.0,
+    val valueDeltaCapitalGains: Double = 0.0,
+    val valueDeltaTrades: Double = 0.0,
+    val valueDeltaReconciliation: Double = 0.0,
+    val valueDeltaOther: Double = 0.0,
+) {
+    companion object {
+        fun fromResultRow(row: ResultRow): AssetTransactionAggregation {
+            return AssetTransactionAggregation(
+                assetId = row[AssetAggregate.assetId],
+                date = row[AssetAggregate.periodEndDate].atStartOfDayIn(TimeZone.currentSystemDefault()).toJavaInstant().toKotlinInstant(),
+                amount = row[AssetAggregate.totalValue],
+                amountDeltaCapitalGains = row[AssetAggregate.deltaCapitalGains],
+                amountDeltaTrades = row[AssetAggregate.deltaTrades],
+                amountDeltaReconciliation = row[AssetAggregate.deltaReconciliation],
+                amountDeltaOther = row[AssetAggregate.deltaOther],
+                value = row[AssetAggregate.totalValue]
+            )
+        }
+    }
+}
 
 interface AssetTransactionSource {
     suspend fun getLatestReconciliation(
@@ -217,7 +234,11 @@ class UserAggregationManager(
                 this[AssetAggregate.assetId] = assetId
                 this[AssetAggregate.aggregationPeriod] = AggregationPeriod.DAILY
                 this[AssetAggregate.periodEndDate] = agg.date.toLocalDateTime(TimeZone.currentSystemDefault()).date
-                this[AssetAggregate.totalValue] = agg.holding
+                this[AssetAggregate.totalValue] = agg.amount
+                this[AssetAggregate.deltaReconciliation] = agg.amountDeltaReconciliation
+                this[AssetAggregate.deltaTrades] = agg.amountDeltaTrades
+                this[AssetAggregate.deltaCapitalGains] = agg.amountDeltaCapitalGains
+                this[AssetAggregate.deltaOther] = agg.amountDeltaOther
             }
         }
         logger.info("Regenerated aggregates for asset $assetId, total ${aggregates.size} entries")
@@ -251,22 +272,38 @@ class AggregationService {
         for (day in dateSpan) {
             val transactionsForDay = transactions.filter { it.timestamp.toLocalDateTime(timezone).date == day }.sortedBy { it.timestamp }
 
+            var amountDeltaReconciliation = 0.0
+            var amountDeltaTrades = 0.0
+            var amountDeltaOther = 0.0
             logger.info("== Processing day ${day} ==")
             logger.info("Transactions: ${transactionsForDay}")
             for (transaction in transactionsForDay) {
                 logger.info("Processing ${transaction}")
-                if (transaction.type == AssetTransactionType.Reconciliation) {
-                    currentHolding = transaction.amount ?: 0.0
-                    logger.info("SET ${currentHolding}")
-                }
-                else {
-                    currentHolding += transaction.amount ?: 0.0
-                    logger.info("CHANGE ${transaction.amount ?: 0.0}")
+                when (transaction.type) {
+                    AssetTransactionType.Trade -> {
+                        currentHolding += transaction.amount ?: 0.0
+                        amountDeltaTrades += transaction.amount ?: 0.0
+                        logger.info("TRADE ${transaction.amount ?: 0.0}")
+                    }
+                    AssetTransactionType.Reconciliation -> {
+                        amountDeltaTrades = 0.0
+                        currentHolding = transaction.amount ?: 0.0
+                        amountDeltaReconciliation += transaction.amount ?: 0.0
+                        logger.info("RECONCILE $currentHolding")
+                    }
                 }
 
             }
             logger.info("== End processing ${day}: ${currentHolding} ==")
-            dailyAggregations.add(AssetTransactionAggregation(asset, day.atTime(23, 59, 0).toInstant(timezone), currentHolding))
+            dailyAggregations.add(
+                AssetTransactionAggregation(
+                    asset,
+                    day.atTime(23, 59, 0).toInstant(timezone),
+                    currentHolding,
+                    amountDeltaReconciliation = amountDeltaReconciliation,
+                    amountDeltaTrades = amountDeltaTrades,
+                )
+            )
         }
 
         return dailyAggregations
