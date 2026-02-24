@@ -83,6 +83,25 @@ data class AssetStalenessResponse(
     val staleAfter: Long
 )
 
+@Serializable
+data class TransactionDto(
+    val id: Uuid,
+    val assetId: Uuid,
+    val type: AssetTransactionType,
+    val amount: Double?,
+    val value: Double?,
+    val timestamp: Long
+)
+
+@Serializable
+data class PaginatedTransactionsResponse(
+    val transactions: List<TransactionDto>,
+    val page: Int,
+    val size: Int,
+    val totalElements: Long,
+    val totalPages: Int
+)
+
 @RestController
 @RequestMapping("/asset")
 class AssetController(

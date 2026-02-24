@@ -53,4 +53,27 @@ class AggregateController {
             AssetTransactionAggregation.fromResultRow(it)
         }
     }
+
+    @Operation(
+        summary = "Get all aggregations",
+        description = "Gets all daily aggregations for an asset across its entire history.",
+    )
+    @GetMapping("/asset/{id}/all")
+    fun getAllAggregateValues(
+        @PathVariable id: String,
+    ): List<AssetTransactionAggregation> {
+        val uuid = Uuid.parse(id)
+        val aggregates = transaction {
+            AssetAggregate
+                .selectAll()
+                .where {
+                    (AssetAggregate.assetId eq uuid) and
+                            (AssetAggregate.aggregationPeriod eq AggregationPeriod.DAILY)
+                }
+                .toList()
+        }
+        return aggregates.map {
+            AssetTransactionAggregation.fromResultRow(it)
+        }
+    }
 }

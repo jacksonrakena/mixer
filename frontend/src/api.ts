@@ -115,6 +115,35 @@ export async function deleteTransaction(
   return res.json();
 }
 
+// ── Transaction listing ──────────────────────────────────────────────────────
+
+export interface TransactionDto {
+  id: string;
+  assetId: string;
+  type: TransactionType;
+  amount: number | null;
+  value: number | null;
+  timestamp: number; // epoch millis
+}
+
+export interface PaginatedTransactionsResponse {
+  transactions: TransactionDto[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+export async function fetchTransactions(
+  assetId: string,
+  page: number = 0,
+  size: number = 10,
+): Promise<PaginatedTransactionsResponse> {
+  const res = await fetch(`${BASE}/asset/${assetId}/transaction?page=${page}&size=${size}`);
+  if (!res.ok) throw new Error(`Failed to fetch transactions: ${res.status}`);
+  return res.json();
+}
+
 // ── Aggregation ───────────────────────────────────────────────────────────────
 
 export async function fetchAggregation(
@@ -124,6 +153,14 @@ export async function fetchAggregation(
 ): Promise<AssetAggregation[]> {
   const res = await fetch(`${BASE}/agg/asset/${assetId}/${start}/${end}`);
   if (!res.ok) throw new Error(`Failed to fetch aggregation: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchAllAggregations(
+  assetId: string,
+): Promise<AssetAggregation[]> {
+  const res = await fetch(`${BASE}/agg/asset/${assetId}/all`);
+  if (!res.ok) throw new Error(`Failed to fetch all aggregations: ${res.status}`);
   return res.json();
 }
 

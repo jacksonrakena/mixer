@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Box from '@mui/joy/Box'
 import Typography from '@mui/joy/Typography'
 import Button from '@mui/joy/Button'
@@ -15,17 +15,11 @@ import CircularProgress from '@mui/joy/CircularProgress'
 import {
   createTransaction,
   deleteTransaction,
+  fetchTransactions,
   type TransactionType,
+  type TransactionDto,
   type CreateTransactionResponse,
 } from './api'
-
-interface TransactionRecord {
-  id: string
-  type: TransactionType
-  amount?: number
-  value?: number
-  timestamp: string
-}
 
 interface TransactionPanelProps {
   assetId: string
@@ -33,15 +27,23 @@ interface TransactionPanelProps {
 }
 
 const TRANSACTION_TYPES: TransactionType[] = ['Trade', 'Reconciliation']
+const PAGE_SIZE = 10
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', {
+function formatDate(epochMs: number) {
+  return new Date(epochMs).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   })
 }
 
+function formatDateTime(epochMs: number) {
+  return new Date(epochMs).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  })
+}
+
 export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPanelProps) => {
-  const [transactions, setTransactions] = useState<TransactionRecord[]>([])
+  // Create form state
   const [type, setType] = useState<TransactionType>('Trade')
   const [amount, setAmount] = useState('')
   const [value, setValue] = useState('')
@@ -51,8 +53,35 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
     return d.toISOString().slice(0, 16)
   })
   const [submitting, setSubmitting] = useState(false)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Transaction list state
+  const [transactions, setTransactions] = useState<TransactionDto[]>([])
+  const [page, setPage] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [totalElements, setTotalElements] = useState(0)
+  const [loadingList, setLoadingList] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const loadTransactions = useCallback(async (p: number) => {
+    setLoadingList(true)
+    try {
+      const res = await fetchTransactions(assetId, p, PAGE_SIZE)
+      setTransactions(res.transactions)
+      setPage(res.page)
+      setTotalPages(res.totalPages)
+      setTotalElements(res.totalElements)
+    } catch (e) {
+      console.error('Failed to load transactions', e)
+    } finally {
+      setLoadingList(false)
+    }
+  }, [assetId])
+
+  useEffect(() => {
+    setPage(0)
+    loadTransactions(0)
+  }, [assetId, loadTransactions])
 
   const handleCreate = async () => {
     if (!amount && !value) {
@@ -69,13 +98,12 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
         value: value ? parseFloat(value) : undefined,
         timestamp: ts,
       })
-      setTransactions((prev) => [
-        { id: res.transactionId, type, amount: amount ? parseFloat(amount) : undefined, value: value ? parseFloat(value) : undefined, timestamp: ts },
-        ...prev,
-      ])
       setAmount('')
       setValue('')
       onTransactionChange(res.staleAfter)
+      // Reload current page to show updated list
+      await loadTransactions(0)
+      setPage(0)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create transaction')
     } finally {
@@ -87,13 +115,22 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
     setDeletingId(txId)
     try {
       const res = await deleteTransaction(assetId, txId)
-      setTransactions((prev) => prev.filter((t) => t.id !== txId))
       onTransactionChange(res.staleAfter)
+      // Reload current page; if page is now empty, go back one page
+      const newTotal = totalElements - 1
+      const newTotalPages = Math.max(1, Math.ceil(newTotal / PAGE_SIZE))
+      const targetPage = page >= newTotalPages ? Math.max(0, newTotalPages - 1) : page
+      await loadTransactions(targetPage)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete transaction')
     } finally {
       setDeletingId(null)
     }
+  }
+
+  const goToPage = (p: number) => {
+    setPage(p)
+    loadTransactions(p)
   }
 
   return (
@@ -204,67 +241,137 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
       </Sheet>
 
       {/* Transaction list */}
-      {transactions.length > 0 && (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-          <Typography level="body-xs" sx={{ color: 'neutral.500', px: 0.5, mb: 0.5 }}>
-            Added this session ({transactions.length})
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 0.5 }}>
+          <Typography level="body-xs" sx={{ color: 'neutral.500' }}>
+            {loadingList ? 'Loading…' : `${totalElements} transaction${totalElements !== 1 ? 's' : ''}`}
           </Typography>
-          {transactions.map((tx, i) => (
-            <Box key={tx.id}>
+          {totalPages > 1 && (
+            <Typography level="body-xs" sx={{ color: 'neutral.500' }}>
+              Page {page + 1} of {totalPages}
+            </Typography>
+          )}
+        </Box>
+
+        {loadingList ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+            <CircularProgress size="sm" />
+          </Box>
+        ) : transactions.length === 0 ? (
+          <Box sx={{ py: 3, textAlign: 'center' }}>
+            <Typography level="body-sm" sx={{ color: 'neutral.600' }}>
+              No transactions yet. Add one above to get started.
+            </Typography>
+          </Box>
+        ) : (
+          <>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {transactions.map((tx, i) => (
+                <Box key={tx.id}>
               {i > 0 && <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)', my: 0.5 }} />}
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  px: 1,
-                  py: 0.75,
-                  borderRadius: '8px',
-                  '&:hover': { background: 'rgba(255,255,255,0.03)' },
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Chip
-                    size="sm"
+                  <Box
                     sx={{
-                      background: tx.type === 'Trade'
-                        ? 'rgba(96,165,250,0.15)'
-                        : 'rgba(167,139,250,0.15)',
-                      color: tx.type === 'Trade' ? '#60a5fa' : '#a78bfa',
-                      border: 'none',
-                      fontSize: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      px: 1.5,
+                      py: 1,
+                      borderRadius: '8px',
+                  '&:hover': { background: 'rgba(255,255,255,0.03)' },
                     }}
                   >
-                    {tx.type}
-                  </Chip>
-                  <Box>
-                    {tx.amount !== undefined && (
-                      <Typography level="body-xs" sx={{ color: 'white' }}>
-                        {tx.amount} units
-                      </Typography>
-                    )}
-                    <Typography level="body-xs" sx={{ color: 'neutral.500' }}>
-                      {formatDate(tx.timestamp)}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1 }}>
+                      <Chip
+                        size="sm"
+                        sx={{
+                          background: tx.type === 'Trade'
+                            ? 'rgba(59,130,246,0.1)'
+                            : 'rgba(139,92,246,0.1)',
+                          color: tx.type === 'Trade' ? '#2563eb' : '#7c3aed',
+                          border: 'none',
+                          fontSize: '10px',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {tx.type}
+                      </Chip>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                          {tx.amount != null && (
+                            <Typography level="body-xs" sx={{ color: tx.amount >= 0 ? '#059669' : '#dc2626', fontWeight: 600 }}>
+                              {tx.amount >= 0 ? '+' : ''}{tx.amount} units
+                            </Typography>
+                          )}
+                          {tx.value != null && (
+                            <Typography level="body-xs" sx={{ color: 'neutral.300' }}>
+                              ${tx.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </Typography>
+                          )}
+                        </Box>
+                        <Typography level="body-xs" sx={{ color: 'neutral.600', fontSize: '10px' }}>
+                          {formatDateTime(tx.timestamp)}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <IconButton
+                      size="sm"
+                      variant="plain"
+                      color="danger"
+                      onClick={() => handleDelete(tx.id)}
+                      disabled={deletingId === tx.id}
+                      sx={{ minWidth: 28, minHeight: 28, flexShrink: 0 }}
+                    >
+                      {deletingId === tx.id
+                        ? <CircularProgress size="sm" sx={{ '--CircularProgress-size': '14px' }} />
+                        : <span style={{ fontSize: 14 }}>✕</span>}
+                    </IconButton>
                   </Box>
                 </Box>
-                <IconButton
+              ))}
+            </Box>
+
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1, pt: 1 }}>
+                <Button
                   size="sm"
                   variant="plain"
-                  color="danger"
-                  onClick={() => handleDelete(tx.id)}
-                  disabled={deletingId === tx.id}
-                  sx={{ minWidth: 28, minHeight: 28 }}
+                  disabled={page === 0}
+                  onClick={() => goToPage(page - 1)}
+                  sx={{ color: 'neutral.400', minWidth: 32, '&:hover': { background: 'rgba(0,0,0,0.04)' } }}
                 >
-                  {deletingId === tx.id
-                    ? <CircularProgress size="sm" sx={{ '--CircularProgress-size': '14px' }} />
-                    : <span style={{ fontSize: 14 }}>✕</span>}
-                </IconButton>
+                  ‹
+                </Button>
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <Button
+                    key={i}
+                    size="sm"
+                    variant={i === page ? 'soft' : 'plain'}
+                    onClick={() => goToPage(i)}
+                    sx={{
+                      minWidth: 32,
+                      color: i === page ? '#059669' : 'neutral.500',
+                      background: i === page ? 'rgba(16,185,129,0.1)' : 'transparent',
+                      '&:hover': { background: i === page ? 'rgba(16,185,129,0.15)' : 'rgba(0,0,0,0.04)' },
+                    }}
+                  >
+                    {i + 1}
+                  </Button>
+                ))}
+                <Button
+                  size="sm"
+                  variant="plain"
+                  disabled={page >= totalPages - 1}
+                  onClick={() => goToPage(page + 1)}
+                  sx={{ color: 'neutral.400', minWidth: 32, '&:hover': { background: 'rgba(0,0,0,0.04)' } }}
+                >
+                  ›
+                </Button>
               </Box>
-            </Box>
-          ))}
-        </Box>
-      )}
+            )}
+          </>
+        )}
+      </Box>
     </Box>
   )
 }

@@ -4,6 +4,7 @@ import com.jacksonrakena.mixer.controller.asset.AssetController.Companion.logger
 import com.jacksonrakena.mixer.core.requests.RecomputeAssetAggregationRequest
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import com.jacksonrakena.mixer.data.tables.concrete.Transaction
+import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
@@ -12,10 +13,12 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import org.jobrunr.scheduling.JobRequestScheduler
 import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 import kotlin.uuid.toKotlinUuid
@@ -25,6 +28,46 @@ import kotlin.uuid.toKotlinUuid
 class AssetTransactionController(
     val scheduler: JobRequestScheduler
 ) {
+
+    @GetMapping
+    fun listTransactions(
+        @PathVariable assetId: UUID,
+        @RequestParam page: Int = 0,
+        @RequestParam size: Int = 10
+    ): PaginatedTransactionsResponse {
+        val assetUuid = assetId.toKotlinUuid()
+        return transaction {
+            val totalElements = Transaction.selectAll()
+                .where { Transaction.assetId eq assetUuid }
+                .count()
+
+            val transactions = Transaction.selectAll()
+                .where { Transaction.assetId eq assetUuid }
+                .orderBy(Transaction.timestamp, SortOrder.DESC)
+                .limit(size)
+                .offset((page * size).toLong())
+                .map {
+                    TransactionDto(
+                        id = it[Transaction.id],
+                        assetId = it[Transaction.assetId],
+                        type = it[Transaction.type],
+                        amount = it[Transaction.amount],
+                        value = it[Transaction.value],
+                        timestamp = it[Transaction.timestamp]
+                    )
+                }
+
+            val totalPages = if (totalElements == 0L) 0 else ((totalElements + size - 1) / size).toInt()
+
+            PaginatedTransactionsResponse(
+                transactions = transactions,
+                page = page,
+                size = size,
+                totalElements = totalElements,
+                totalPages = totalPages
+            )
+        }
+    }
 
     @PutMapping
     fun createTransaction(
