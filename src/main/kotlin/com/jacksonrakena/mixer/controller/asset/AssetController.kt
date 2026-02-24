@@ -10,6 +10,7 @@ import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 import java.util.logging.Logger
 import kotlin.time.Instant
@@ -35,7 +37,8 @@ data class CreateTransactionRequest(
 data class CreateTransactionResponse(
     val transactionId: Uuid,
     val assetId: Uuid,
-    val jobId: Uuid
+    val jobId: Uuid,
+    val staleAfter: Long
 )
 
 @Serializable
@@ -61,7 +64,8 @@ data class DeleteTransactionResponse(
     val transactionId: Uuid,
     val assetId: Uuid,
     val deleted: Boolean,
-    val jobId: Uuid
+    val jobId: Uuid,
+    val staleAfter: Long
 )
 
 @Serializable
@@ -69,7 +73,14 @@ data class AssetDto(
     val id: Uuid,
     val name: String,
     val ownerId: Uuid,
-    val currency: String
+    val currency: String,
+    val staleAfter: Long = 0
+)
+
+@Serializable
+data class AssetStalenessResponse(
+    val assetId: Uuid,
+    val staleAfter: Long
 )
 
 @RestController
@@ -88,7 +99,8 @@ class AssetController(
                     id = it[Asset.id],
                     name = it[Asset.name],
                     ownerId = it[Asset.ownerId],
-                    currency = it[Asset.currency]
+                    currency = it[Asset.currency],
+                    staleAfter = it[Asset.staleAfter]
                 )
             }
         }
@@ -131,5 +143,18 @@ class AssetController(
         logger.info("Deleted asset $assetId: $deleted")
 
         return DeleteAssetResponse(assetId = assetId, deleted = deleted)
+    }
+
+    @GetMapping("/{id}/staleness")
+    fun getAssetStaleness(@PathVariable id: UUID): AssetStalenessResponse {
+        val assetId = id.toKotlinUuid()
+        val asset = transaction {
+            Asset.selectAll().where { Asset.id eq assetId }.firstOrNull()
+        } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found")
+
+        return AssetStalenessResponse(
+            assetId = assetId,
+            staleAfter = asset[Asset.staleAfter]
+        )
     }
 }

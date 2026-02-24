@@ -29,7 +29,7 @@ interface TransactionRecord {
 
 interface TransactionPanelProps {
   assetId: string
-  onTransactionChange: () => void
+  onTransactionChange: (staleAfter: number) => void
 }
 
 const TRANSACTION_TYPES: TransactionType[] = ['Trade', 'Reconciliation']
@@ -75,7 +75,7 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
       ])
       setAmount('')
       setValue('')
-      onTransactionChange()
+      onTransactionChange(res.staleAfter)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create transaction')
     } finally {
@@ -86,9 +86,9 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
   const handleDelete = async (txId: string) => {
     setDeletingId(txId)
     try {
-      await deleteTransaction(assetId, txId)
+      const res = await deleteTransaction(assetId, txId)
       setTransactions((prev) => prev.filter((t) => t.id !== txId))
-      onTransactionChange()
+      onTransactionChange(res.staleAfter)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete transaction')
     } finally {

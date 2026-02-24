@@ -12,13 +12,19 @@ export default function App() {
   const [assets, setAssets] = useState<AssetDto[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loadingAssets, setLoadingAssets] = useState(true)
-  const [chartKey, setChartKey] = useState(0)
+  const [staleAfterMap, setStaleAfterMap] = useState<Record<string, number>>({})
 
   useEffect(() => {
     fetchAssets()
       .then((data) => {
         setAssets(data)
         if (data.length > 0) setSelectedId(data[0].id)
+        // Initialize staleAfter from asset data
+        const initialStale: Record<string, number> = {}
+        for (const asset of data) {
+          if (asset.staleAfter > 0) initialStale[asset.id] = asset.staleAfter
+        }
+        setStaleAfterMap(initialStale)
       })
       .catch(console.error)
       .finally(() => setLoadingAssets(false))
@@ -26,10 +32,12 @@ export default function App() {
 
   const selectedAsset = assets.find((a) => a.id === selectedId) ?? null
 
-  // Called after a transaction is added/removed so chart refreshes
-  const handleTransactionChange = useCallback(() => {
-    setChartKey((k) => k + 1)
-  }, [])
+  // Called after a transaction is added/removed — update staleness for the asset
+  const handleTransactionChange = useCallback((staleAfter: number) => {
+    if (selectedId && staleAfter > 0) {
+      setStaleAfterMap((prev) => ({ ...prev, [selectedId]: staleAfter }))
+    }
+  }, [selectedId])
 
   return (
     <Box
@@ -139,10 +147,11 @@ export default function App() {
             <>
               {/* Chart */}
               <AssetChart
-                key={`chart-${selectedAsset.id}-${chartKey}`}
+                key={`chart-${selectedAsset.id}`}
                 assetId={selectedAsset.id}
                 assetName={selectedAsset.name}
                 currency={selectedAsset.currency}
+                staleAfter={staleAfterMap[selectedAsset.id] ?? 0}
               />
 
               {/* Transactions panel */}

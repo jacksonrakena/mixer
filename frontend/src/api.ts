@@ -8,6 +8,7 @@ export interface AssetDto {
   name: string;
   ownerId: string;
   currency: string;
+  staleAfter: number; // epoch millis, 0 = not stale
 }
 
 export interface CreateAssetRequest {
@@ -38,6 +39,7 @@ export interface CreateTransactionResponse {
   transactionId: string;
   assetId: string;
   jobId: string;
+  staleAfter: number; // epoch millis
 }
 
 export interface DeleteTransactionResponse {
@@ -45,6 +47,7 @@ export interface DeleteTransactionResponse {
   assetId: string;
   deleted: boolean;
   jobId: string;
+  staleAfter: number; // epoch millis
 }
 
 export interface AssetAggregation {
@@ -121,6 +124,19 @@ export async function fetchAggregation(
 ): Promise<AssetAggregation[]> {
   const res = await fetch(`${BASE}/agg/asset/${assetId}/${start}/${end}`);
   if (!res.ok) throw new Error(`Failed to fetch aggregation: ${res.status}`);
+  return res.json();
+}
+
+// ── Staleness ─────────────────────────────────────────────────────────────────
+
+export interface AssetStalenessResponse {
+  assetId: string;
+  staleAfter: number; // epoch millis, 0 = not stale
+}
+
+export async function fetchAssetStaleness(assetId: string): Promise<AssetStalenessResponse> {
+  const res = await fetch(`${BASE}/asset/${assetId}/staleness`);
+  if (!res.ok) throw new Error(`Failed to fetch staleness: ${res.status}`);
   return res.json();
 }
 

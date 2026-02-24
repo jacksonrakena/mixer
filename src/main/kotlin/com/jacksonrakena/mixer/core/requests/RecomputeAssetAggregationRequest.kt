@@ -1,8 +1,12 @@
 package com.jacksonrakena.mixer.core.requests
 
 import com.jacksonrakena.mixer.data.UserAggregationManager
+import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.update
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jobrunr.jobs.lambdas.JobRequest
 import org.jobrunr.jobs.lambdas.JobRequestHandler
 import org.springframework.stereotype.Component
@@ -31,6 +35,13 @@ class RecomputeAssetAggregationRequest(
             runBlocking {
                 userAggregationManager.regenerateAggregatesForAsset(request.assetId)
             }
+
+            transaction {
+                Asset.update({ Asset.id eq request.assetId }) {
+                    it[staleAfter] = 0L
+                }
+            }
+            logger.info("Cleared staleAfter for asset ${request.assetId}")
         }
 
         companion object {
