@@ -7,7 +7,14 @@ import Card from "@mui/joy/Card";
 import CardContent from "@mui/joy/CardContent";
 import Chip from "@mui/joy/Chip";
 import { LineChart } from "@mui/x-charts/LineChart";
-import { fetchAggregation, fetchAllAggregations, fetchAssetStaleness, daysAgo, today, type AssetAggregation } from "./api";
+import {
+  fetchAggregation,
+  fetchAllAggregations,
+  fetchAssetStaleness,
+  daysAgo,
+  today,
+  type AssetAggregation,
+} from "./api";
 
 // ── Tooltip helpers ──────────────────────────────────────────────────────────
 
@@ -32,38 +39,32 @@ function deltaStyle(v: number): React.CSSProperties {
 
 interface DeltaRow {
   label: string;
-  valueDelta: number;
   amountDelta: number;
 }
 
 /** Check if a data point has any non-zero reconciliation deltas */
 function hasReconciliation(d: AssetAggregation): boolean {
-  return d.valueDeltaReconciliation !== 0 || d.amountDeltaReconciliation !== 0;
+  return d.amountDeltaReconciliation !== 0;
 }
 
 /** Check if a data point has any non-zero activity (excluding reconciliation) */
 function hasActivity(d: AssetAggregation): boolean {
-  return (
-    d.valueDeltaCapitalGains !== 0 ||
-    d.valueDeltaTrades !== 0 ||
-    d.valueDeltaOther !== 0 ||
-    d.amountDeltaCapitalGains !== 0 ||
-    d.amountDeltaTrades !== 0 ||
-    d.amountDeltaOther !== 0
-  );
+  return d.amountDeltaTrades !== 0 || d.amountDeltaOther !== 0;
+}
+
+/** Get the best display value for a data point (prefers displayValue, falls back to nativeValue) */
+function getDisplayValue(d: AssetAggregation): number {
+  return d.displayValue ?? d.nativeValue;
 }
 
 /** Build delta rows for the tooltip (only include non-zero rows) */
 function buildDeltaRows(d: AssetAggregation): DeltaRow[] {
   const rows: DeltaRow[] = [];
-  if (d.valueDeltaCapitalGains !== 0 || d.amountDeltaCapitalGains !== 0) {
-    rows.push({ label: "Capital Gains", valueDelta: d.valueDeltaCapitalGains, amountDelta: d.amountDeltaCapitalGains });
+  if (d.amountDeltaTrades !== 0) {
+    rows.push({ label: "Trades", amountDelta: d.amountDeltaTrades });
   }
-  if (d.valueDeltaTrades !== 0 || d.amountDeltaTrades !== 0) {
-    rows.push({ label: "Trades", valueDelta: d.valueDeltaTrades, amountDelta: d.amountDeltaTrades });
-  }
-  if (d.valueDeltaOther !== 0 || d.amountDeltaOther !== 0) {
-    rows.push({ label: "Other", valueDelta: d.valueDeltaOther, amountDelta: d.amountDeltaOther });
+  if (d.amountDeltaOther !== 0) {
+    rows.push({ label: "Other", amountDelta: d.amountDeltaOther });
   }
   return rows;
 }
@@ -78,7 +79,13 @@ interface ChartTooltipProps {
   containerWidth: number;
 }
 
-function ChartTooltip({ point, currency, x, y, containerWidth }: ChartTooltipProps) {
+function ChartTooltip({
+  point,
+  currency,
+  x,
+  y,
+  containerWidth,
+}: ChartTooltipProps) {
   const date = new Date(point.date);
   const dateStr = date.toLocaleDateString("en-US", {
     weekday: "short",
@@ -90,9 +97,12 @@ function ChartTooltip({ point, currency, x, y, containerWidth }: ChartTooltipPro
   const deltaRows = buildDeltaRows(point);
   const showRecon = hasReconciliation(point);
   const showDeltas = hasActivity(point);
+  const displayVal = getDisplayValue(point);
+  const hasFx = point.fxConversion !== null;
+  const effectiveCurrency = point.displayCurrency ?? currency;
 
   // Position tooltip to avoid overflow — flip to left side if too close to right edge
-  const tooltipWidth = 280;
+  const tooltipWidth = 300;
   const flipX = x + tooltipWidth + 20 > containerWidth;
 
   return (
@@ -114,59 +124,174 @@ function ChartTooltip({ point, currency, x, y, containerWidth }: ChartTooltipPro
       }}
     >
       {/* Date header */}
-      <Typography level="body-xs" sx={{ color: "rgba(0,0,0,0.45)", mb: 0.75, fontWeight: 600 }}>
+      <Typography
+        level="body-xs"
+        sx={{ color: "rgba(0,0,0,0.45)", mb: 0.75, fontWeight: 600 }}
+      >
         {dateStr}
       </Typography>
 
-      {/* Current value & amount */}
+      {/* Display value (converted) */}
       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
         <Typography level="body-sm" sx={{ color: "rgba(0,0,0,0.55)" }}>
           Value
         </Typography>
-        <Typography level="body-sm" sx={{ color: "#1e293b", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-          {point.value.toLocaleString(undefined, { maximumFractionDigits: 4 })} {currency}
+        <Typography
+          level="body-sm"
+          sx={{
+            color: "#1e293b",
+            fontWeight: 700,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {displayVal.toLocaleString(undefined, { maximumFractionDigits: 2 })}{" "}
+          {effectiveCurrency}
         </Typography>
       </Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", mb: showDeltas || showRecon ? 1 : 0 }}>
+
+      {/* Native value (if different currency) */}
+      {hasFx && (
+        <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+          <Typography level="body-xs" sx={{ color: "rgba(0,0,0,0.4)" }}>
+            Native
+          </Typography>
+          <Typography
+            level="body-xs"
+            sx={{
+              color: "rgba(0,0,0,0.5)",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {point.nativeValue.toLocaleString(undefined, {
+              maximumFractionDigits: 4,
+            })}{" "}
+            {point.nativeCurrency}
+          </Typography>
+        </Box>
+      )}
+
+      {/* Amount (units held) */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          mb: showDeltas || showRecon || hasFx ? 1 : 0,
+        }}
+      >
         <Typography level="body-sm" sx={{ color: "rgba(0,0,0,0.55)" }}>
           Amount
         </Typography>
-        <Typography level="body-sm" sx={{ color: "#1e293b", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+        <Typography
+          level="body-sm"
+          sx={{
+            color: "#1e293b",
+            fontWeight: 700,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
           {point.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}
         </Typography>
       </Box>
 
+      {/* FX conversion info */}
+      {hasFx && point.fxConversion && (
+        <Box
+          sx={{
+            borderTop: "1px solid rgba(0,0,0,0.08)",
+            pt: 0.75,
+            mb: showDeltas || showRecon ? 0.5 : 0,
+          }}
+        >
+          <Typography
+            level="body-xs"
+            sx={{ color: "rgba(0,0,0,0.35)", fontWeight: 600, mb: 0.25 }}
+          >
+            FX Conversion
+          </Typography>
+          <Box
+            sx={{ display: "flex", justifyContent: "space-between", py: 0.15 }}
+          >
+            <Typography level="body-xs" sx={{ color: "rgba(0,0,0,0.5)" }}>
+              Rate
+            </Typography>
+            <Typography
+              level="body-xs"
+              sx={{
+                color: "#1e293b",
+                fontWeight: 600,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              1 {point.fxConversion.fromCurrency} ={" "}
+              {point.fxConversion.rate.toLocaleString(undefined, {
+                maximumFractionDigits: 6,
+              })}{" "}
+              {point.fxConversion.toCurrency}
+            </Typography>
+          </Box>
+          <Box
+            sx={{ display: "flex", justifyContent: "space-between", py: 0.15 }}
+          >
+            <Typography level="body-xs" sx={{ color: "rgba(0,0,0,0.5)" }}>
+              Rate date
+            </Typography>
+            <Typography
+              level="body-xs"
+              sx={{
+                color: "rgba(0,0,0,0.5)",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {point.fxConversion.rateDate}
+            </Typography>
+          </Box>
+        </Box>
+      )}
+
       {/* Delta rows */}
       {showDeltas && deltaRows.length > 0 && (
         <>
-          <Box sx={{ borderTop: "1px solid rgba(0,0,0,0.08)", pt: 0.75, mb: 0.5 }}>
-            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.25 }}>
-              <Typography level="body-xs" sx={{ color: "rgba(0,0,0,0.35)", fontWeight: 600 }}>
-                Deltas
+          <Box
+            sx={{ borderTop: "1px solid rgba(0,0,0,0.08)", pt: 0.75, mb: 0.5 }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                mb: 0.25,
+              }}
+            >
+              <Typography
+                level="body-xs"
+                sx={{ color: "rgba(0,0,0,0.35)", fontWeight: 600 }}
+              >
+                Deltas (units)
               </Typography>
-              <Box sx={{ display: "flex", gap: 2 }}>
-                <Typography level="body-xs" sx={{ color: "rgba(0,0,0,0.35)", fontWeight: 600, minWidth: 70, textAlign: "right" }}>
-                  Value
-                </Typography>
-                <Typography level="body-xs" sx={{ color: "rgba(0,0,0,0.35)", fontWeight: 600, minWidth: 70, textAlign: "right" }}>
-                  Amount
-                </Typography>
-              </Box>
             </Box>
           </Box>
           {deltaRows.map((row) => (
-            <Box key={row.label} sx={{ display: "flex", justifyContent: "space-between", py: 0.15 }}>
+            <Box
+              key={row.label}
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                py: 0.15,
+              }}
+            >
               <Typography level="body-xs" sx={{ color: "rgba(0,0,0,0.5)" }}>
                 {row.label}
               </Typography>
-              <Box sx={{ display: "flex", gap: 2 }}>
-                <Typography level="body-xs" sx={{ minWidth: 70, textAlign: "right", fontWeight: 600, ...deltaStyle(row.valueDelta) }}>
-                  {fmtDelta(row.valueDelta)}
-                </Typography>
-                <Typography level="body-xs" sx={{ minWidth: 70, textAlign: "right", fontWeight: 600, ...deltaStyle(row.amountDelta) }}>
-                  {fmtDelta(row.amountDelta)}
-                </Typography>
-              </Box>
+              <Typography
+                level="body-xs"
+                sx={{
+                  minWidth: 70,
+                  textAlign: "right",
+                  fontWeight: 600,
+                  ...deltaStyle(row.amountDelta),
+                }}
+              >
+                {fmtDelta(row.amountDelta)}
+              </Typography>
             </Box>
           ))}
         </>
@@ -174,26 +299,37 @@ function ChartTooltip({ point, currency, x, y, containerWidth }: ChartTooltipPro
 
       {/* Reconciliation — show new values instead of deltas */}
       {showRecon && (
-        <Box sx={{ borderTop: "1px solid rgba(0,0,0,0.08)", pt: 0.75, mt: showDeltas ? 0.5 : 0 }}>
-          <Typography level="body-xs" sx={{ color: "rgba(0,0,0,0.35)", fontWeight: 600, mb: 0.25 }}>
+        <Box
+          sx={{
+            borderTop: "1px solid rgba(0,0,0,0.08)",
+            pt: 0.75,
+            mt: showDeltas ? 0.5 : 0,
+          }}
+        >
+          <Typography
+            level="body-xs"
+            sx={{ color: "rgba(0,0,0,0.35)", fontWeight: 600, mb: 0.25 }}
+          >
             Reconciliation
           </Typography>
-          {point.valueDeltaReconciliation !== 0 && (
-            <Box sx={{ display: "flex", justifyContent: "space-between", py: 0.15 }}>
-              <Typography level="body-xs" sx={{ color: "rgba(0,0,0,0.5)" }}>
-                Value
-              </Typography>
-              <Typography level="body-xs" sx={{ fontWeight: 600, ...deltaStyle(point.valueDeltaReconciliation) }}>
-                {fmtDelta(point.valueDeltaReconciliation)}
-              </Typography>
-            </Box>
-          )}
           {point.amountDeltaReconciliation !== 0 && (
-            <Box sx={{ display: "flex", justifyContent: "space-between", py: 0.15 }}>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                py: 0.15,
+              }}
+            >
               <Typography level="body-xs" sx={{ color: "rgba(0,0,0,0.5)" }}>
                 Amount
               </Typography>
-              <Typography level="body-xs" sx={{ fontWeight: 600, ...deltaStyle(point.amountDeltaReconciliation) }}>
+              <Typography
+                level="body-xs"
+                sx={{
+                  fontWeight: 600,
+                  ...deltaStyle(point.amountDeltaReconciliation),
+                }}
+              >
                 {fmtDelta(point.amountDeltaReconciliation)}
               </Typography>
             </Box>
@@ -209,6 +345,7 @@ interface AssetChartProps {
   assetName: string;
   currency: string;
   staleAfter: number; // epoch millis, 0 = not stale
+  displayCurrency?: string;
 }
 
 type DateRange = "7d" | "30d" | "90d" | "1y" | "all";
@@ -241,28 +378,35 @@ function fillDateRange(
   const result: AssetAggregation[] = [];
   const cursor = new Date(startIso + "T00:00:00Z");
   const end = new Date(endIso + "T00:00:00Z");
-  let lastValue = data.length > 0 ? data[0].value : 0;
+  let lastDisplayValue = data.length > 0 ? getDisplayValue(data[0]) : 0;
+  let lastNativeValue = data.length > 0 ? data[0].nativeValue : 0;
+  let lastNativeCurrency = data.length > 0 ? data[0].nativeCurrency : null;
+  let lastDisplayCurrency = data.length > 0 ? data[0].displayCurrency : null;
+  let lastFxConversion = data.length > 0 ? data[0].fxConversion : null;
 
   while (cursor <= end) {
     const key = cursor.toISOString().slice(0, 10);
     const existing = byDate.get(key);
     if (existing) {
-      lastValue = existing.value;
+      lastDisplayValue = getDisplayValue(existing);
+      lastNativeValue = existing.nativeValue;
+      lastNativeCurrency = existing.nativeCurrency;
+      lastDisplayCurrency = existing.displayCurrency;
+      lastFxConversion = existing.fxConversion;
       result.push(existing);
     } else {
       result.push({
         assetId: data[0]?.assetId ?? "",
         date: cursor.toISOString(),
-        amount: lastValue,
-        amountDeltaCapitalGains: 0,
+        amount: lastNativeValue,
         amountDeltaTrades: 0,
         amountDeltaReconciliation: 0,
         amountDeltaOther: 0,
-        value: lastValue,
-        valueDeltaCapitalGains: 0,
-        valueDeltaTrades: 0,
-        valueDeltaReconciliation: 0,
-        valueDeltaOther: 0,
+        nativeValue: lastNativeValue,
+        displayValue: lastDisplayValue,
+        nativeCurrency: lastNativeCurrency,
+        displayCurrency: lastDisplayCurrency,
+        fxConversion: lastFxConversion,
       });
     }
     cursor.setUTCDate(cursor.getUTCDate() + 1);
@@ -277,6 +421,7 @@ export const AssetChart = ({
   assetName,
   currency,
   staleAfter: initialStaleAfter,
+  displayCurrency: displayCurrencyOverride,
 }: AssetChartProps) => {
   const [data, setData] = useState<AssetAggregation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -287,7 +432,10 @@ export const AssetChart = ({
 
   // Tooltip tracking state
   const [tooltipIndex, setTooltipIndex] = useState<number | null>(null);
-  const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [mousePos, setMousePos] = useState<{ x: number; y: number }>({
+    x: 0,
+    y: 0,
+  });
 
   // Keep staleAfter in sync when the prop changes (e.g. after a new transaction)
   useEffect(() => {
@@ -308,7 +456,11 @@ export const AssetChart = ({
     if (staleAfter === 0) return false;
     if (range === "all") return true; // "all" always includes the stale date
     const staleDate = new Date(staleAfter).toISOString().slice(0, 10);
-    return chartRange !== null && staleDate >= chartRange.start && staleDate <= chartRange.end;
+    return (
+      chartRange !== null &&
+      staleDate >= chartRange.start &&
+      staleDate <= chartRange.end
+    );
   }, [staleAfter, chartRange, range]);
 
   // Fetch aggregation data
@@ -318,8 +470,13 @@ export const AssetChart = ({
     setError(null);
 
     const promise = chartRange
-      ? fetchAggregation(assetId, chartRange.start, chartRange.end)
-      : fetchAllAggregations(assetId);
+      ? fetchAggregation(
+          assetId,
+          chartRange.start,
+          chartRange.end,
+          displayCurrencyOverride,
+        )
+      : fetchAllAggregations(assetId, displayCurrencyOverride);
 
     promise
       .then((d) => {
@@ -341,7 +498,7 @@ export const AssetChart = ({
         setError(e instanceof Error ? e.message : "Failed to fetch data"),
       )
       .finally(() => setLoading(false));
-  }, [assetId, chartRange]);
+  }, [assetId, chartRange, displayCurrencyOverride]);
 
   // Load data on mount and when range/asset changes
   useEffect(() => {
@@ -370,8 +527,11 @@ export const AssetChart = ({
     return () => clearInterval(interval);
   }, [isStale, assetId, loadData]);
 
-  const currentValue = data.length > 0 ? data[data.length - 1].value : null;
-  const firstValue = data.length > 0 ? data[0].value : null;
+  const currentValue =
+    data.length > 0 ? getDisplayValue(data[data.length - 1]) : null;
+  const firstValue = data.length > 0 ? getDisplayValue(data[0]) : null;
+  const effectiveDisplayCurrency =
+    data.length > 0 ? (data[0].displayCurrency ?? currency) : currency;
   const change =
     currentValue !== null && firstValue !== null && firstValue !== 0
       ? ((currentValue - firstValue) / firstValue) * 100
@@ -382,7 +542,7 @@ export const AssetChart = ({
     () => data.map((d) => new Date(d.date).getTime()),
     [data],
   );
-  const yValues = useMemo(() => data.map((d) => d.value), [data]);
+  const yValues = useMemo(() => data.map((d) => getDisplayValue(d)), [data]);
 
   // ── Tooltip mouse handlers ──────────────────────────────────────────────────
 
@@ -394,7 +554,9 @@ export const AssetChart = ({
   const getLinePointXPositions = useCallback((): number[] | null => {
     const container = containerRef.current;
     if (!container) return null;
-    const path = container.querySelector<SVGPathElement>(".MuiLineElement-root");
+    const path = container.querySelector<SVGPathElement>(
+      ".MuiLineElement-root",
+    );
     if (!path) return null;
     const d = path.getAttribute("d");
     if (!d) return null;
@@ -404,7 +566,8 @@ export const AssetChart = ({
     // being the last pair of coordinates: C cx1,cy1 cx2,cy2 x,y
     const positions: number[] = [];
     // Match M or L followed by x,y  OR  C followed by cx1,cy1 cx2,cy2 x,y
-    const re = /([MLC])\s*([-\d.e]+)[,\s]([-\d.e]+)(?:[,\s]([-\d.e]+)[,\s]([-\d.e]+)[,\s]([-\d.e]+)[,\s]([-\d.e]+))?/gi;
+    const re =
+      /([MLC])\s*([-\d.e]+)[,\s]([-\d.e]+)(?:[,\s]([-\d.e]+)[,\s]([-\d.e]+)[,\s]([-\d.e]+)[,\s]([-\d.e]+))?/gi;
     let match: RegExpExecArray | null;
     while ((match = re.exec(d)) !== null) {
       const cmd = match[1].toUpperCase();
@@ -504,14 +667,14 @@ export const AssetChart = ({
               {currentValue !== null && (
                 <Typography level="h3" sx={{ color: "white", fontWeight: 800 }}>
                   {currentValue.toLocaleString(undefined, {
-                    maximumFractionDigits: 4,
+                    maximumFractionDigits: 2,
                   })}
                   <Typography
                     component="span"
                     level="body-sm"
                     sx={{ color: "neutral.400", ml: 0.5 }}
                   >
-                    {currency}
+                    {effectiveDisplayCurrency}
                   </Typography>
                 </Typography>
               )}
@@ -619,7 +782,9 @@ export const AssetChart = ({
               >
                 <CircularProgress
                   size="md"
-                  sx={{ "--CircularProgress-trackColor": "rgba(99,102,241,0.15)" }}
+                  sx={{
+                    "--CircularProgress-trackColor": "rgba(99,102,241,0.15)",
+                  }}
                 />
                 <Typography
                   level="body-sm"
@@ -629,9 +794,14 @@ export const AssetChart = ({
                 </Typography>
                 <Typography
                   level="body-xs"
-                  sx={{ color: "neutral.500", textAlign: "center", maxWidth: 260 }}
+                  sx={{
+                    color: "neutral.500",
+                    textAlign: "center",
+                    maxWidth: 260,
+                  }}
                 >
-                  New transaction data is being processed. The chart will update automatically.
+                  New transaction data is being processed. The chart will update
+                  automatically.
                 </Typography>
               </Box>
             )}
@@ -659,7 +829,9 @@ export const AssetChart = ({
                 currency={currency}
                 x={crosshairX ?? mousePos.x}
                 y={mousePos.y}
-                containerWidth={containerRef.current?.getBoundingClientRect().width ?? 600}
+                containerWidth={
+                  containerRef.current?.getBoundingClientRect().width ?? 600
+                }
               />
             )}
 

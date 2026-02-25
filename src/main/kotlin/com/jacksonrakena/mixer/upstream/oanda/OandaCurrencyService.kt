@@ -7,12 +7,14 @@ import com.jacksonrakena.mixer.upstream.CurrencyRangeResponse
 import com.jacksonrakena.mixer.upstream.CurrencyResponse
 import com.jacksonrakena.mixer.upstream.CurrencyResponseMeta
 import com.jacksonrakena.mixer.upstream.CurrencyService
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import java.time.Instant
 import java.time.ZoneId
-import java.util.logging.Logger
+
+private val logger = KotlinLogging.logger {}
 
 data class OandaResponse(
     val instrument: String,
@@ -43,13 +45,9 @@ data class CandlestickValue(
 @ConditionalOnProperty("mixer.currency.provider", havingValue = "oanda")
 class OandaCurrencyService(val app: MixerApplication, val client: RestClient, val config: MixerConfiguration) :
     CurrencyService {
-    companion object {
-        val logger = Logger.getLogger(OandaCurrencyService::class.java.name)
-    }
-
 
     override fun getExchangeRate(base: String, pair: String): CurrencyResponse {
-        logger.info("Fetching exchange rate for $base/$pair")
+        logger.info { "Fetching exchange rate for $base/$pair" }
 
         val response = client
             .get()
@@ -65,7 +63,7 @@ class OandaCurrencyService(val app: MixerApplication, val client: RestClient, va
         }
 
         val rate = response.body!!.candles[0].mid.close
-        logger.info("Established exchange rate for $base/$pair as $rate")
+        logger.info { "Established exchange rate for $base/$pair as $rate" }
         return CurrencyResponse(
             rate = rate,
             meta = CurrencyResponseMeta(
@@ -79,7 +77,7 @@ class OandaCurrencyService(val app: MixerApplication, val client: RestClient, va
     override fun getHistoricExchangeRates(pair: Pair<String, String>): CurrencyRangeResponse {
         val end = Instant.now().atZone(ZoneId.systemDefault())
         val start = end.minusDays(4950)
-        logger.info("$pair: fetching rate history from $start to $end")
+        logger.info { "$pair: fetching rate history from $start to $end" }
         val response = client
             .get()
             .uri(

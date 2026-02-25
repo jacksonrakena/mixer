@@ -15,10 +15,12 @@ import org.jobrunr.jobs.lambdas.JobRequest
 import org.jobrunr.jobs.lambdas.JobRequestHandler
 import org.jobrunr.scheduling.JobRequestScheduler
 import org.springframework.stereotype.Component
-import java.util.logging.Logger
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+
+private val logger = KotlinLogging.logger {}
 
 @Serializable
 class InsertSeedDataRequest: JobRequest {
@@ -34,7 +36,7 @@ class InsertSeedDataRequest: JobRequest {
     ) : JobRequestHandler<InsertSeedDataRequest> {
         override fun run(request: InsertSeedDataRequest?) {
             if (request == null) {
-                logger.warning("Received null request for InsertSeedDataRequestHandler")
+                logger.warn { "Received null request for InsertSeedDataRequestHandler" }
                 return
             }
 
@@ -48,7 +50,7 @@ class InsertSeedDataRequest: JobRequest {
                 Asset.insert {
                     it[Asset.id] = assetId
                     it[Asset.name] = "test asset"
-                    it[Asset.currency] = "AUD"
+                    it[Asset.currency] = "USD"
                     it[Asset.ownerId] = Uuid.parse("6c942179-c993-4b25-86dd-6346fb0e3005")
                 }
                 Transaction.batchInsert(
@@ -303,12 +305,11 @@ class InsertSeedDataRequest: JobRequest {
                     this[Transaction.value] = it.value
                 }
             }
-            logger.info("Finished seed data")
+            logger.info { "Finished seed data" }
             jobRequestScheduler.enqueue(RecomputeUserAggregationRequest(Uuid.parse("6c942179-c993-4b25-86dd-6346fb0e3005")))
         }
 
         companion object {
-            val logger = Logger.getLogger(InsertSeedDataRequestHandler::class.java.name)
         }
     }
 }

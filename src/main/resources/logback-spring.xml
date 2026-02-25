@@ -1,0 +1,34 @@
+<configuration>
+    <conversionRule conversionWord="clr" class="org.springframework.boot.logging.logback.ColorConverter"/>
+    <conversionRule conversionWord="wex" class="org.springframework.boot.logging.logback.WhitespaceThrowableProxyConverter"/>
+    <conversionRule conversionWord="mdc" class="com.jacksonrakena.mixer.logging.ShortMdcConverter"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <!--
+                Pattern breakdown:
+                  %d{HH:mm:ss.SSS}             – timestamp
+                  %clr(%-5level)               – coloured log level (5-char padded)
+                  [%t]                         – thread name (no padding)
+                  %clr(%-40.40logger{39}){cyan} – logger name in cyan (truncated)
+                  %msg                         – message
+                  %clr(%mdc){yellow}           – MDC context after message (filtered/shortened)
+                  %n%wex                       – newline + exception (whitespace-trimmed)
+            -->
+            <pattern>%d{HH:mm:ss.SSS} %clr(%-5level) [%t] %clr(%-40.40logger{39}){cyan} %msg%clr( {%mdc}){yellow}%n%wex</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Silence noisy Spring/Hibernate internals at WARN -->
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="org.jobrunr" level="WARN"/>
+    <logger name="com.zaxxer" level="WARN"/>
+    <logger name="org.jetbrains.exposed" level="WARN"/>
+
+    <!-- Application code at DEBUG so per-day aggregation traces are visible when needed -->
+    <logger name="com.jacksonrakena.mixer" level="DEBUG"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

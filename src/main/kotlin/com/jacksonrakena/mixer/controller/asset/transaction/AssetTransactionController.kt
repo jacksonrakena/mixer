@@ -1,8 +1,8 @@
-package com.jacksonrakena.mixer.controller.asset
+package com.jacksonrakena.mixer.controller.asset.transaction
 
-import com.jacksonrakena.mixer.controller.asset.AssetController.Companion.logger
 import com.jacksonrakena.mixer.core.requests.RecomputeAssetAggregationRequest
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
+import io.github.oshai.kotlinlogging.KotlinLogging
 import com.jacksonrakena.mixer.data.tables.concrete.Transaction
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.eq
@@ -22,6 +22,8 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 import kotlin.uuid.toKotlinUuid
+
+private val logger = KotlinLogging.logger {}
 
 @RestController
 @RequestMapping("/asset/{assetId}/transaction")
@@ -84,8 +86,10 @@ class AssetTransactionController(
             }[Transaction.id]
 
             val txTimestamp = request.timestamp.toEpochMilliseconds()
-            val currentStaleAfter = Asset.selectAll().where { Asset.id eq assetId.toKotlinUuid() }.first()[Asset.staleAfter]
-            val newStaleAfter = if (currentStaleAfter == 0L || txTimestamp < currentStaleAfter) txTimestamp else currentStaleAfter
+            val currentStaleAfter =
+                Asset.selectAll().where { Asset.id eq assetId.toKotlinUuid() }.first()[Asset.staleAfter]
+            val newStaleAfter =
+                if (currentStaleAfter == 0L || txTimestamp < currentStaleAfter) txTimestamp else currentStaleAfter
             Asset.update({ Asset.id eq assetId.toKotlinUuid() }) {
                 it[Asset.staleAfter] = newStaleAfter
             }
@@ -94,7 +98,7 @@ class AssetTransactionController(
         }
 
         val jobId = scheduler.enqueue(RecomputeAssetAggregationRequest(assetId.toKotlinUuid()))
-        logger.info("Scheduled RecomputeAssetAggregationRequest $jobId for asset $assetId after transaction $transactionId")
+        logger.info { "Scheduled RecomputeAssetAggregationRequest $jobId for asset $assetId after transaction $transactionId" }
 
         return CreateTransactionResponse(
             transactionId = transactionId,
@@ -122,7 +126,8 @@ class AssetTransactionController(
                 Transaction.deleteWhere { Transaction.id eq transactionUuid }
 
                 val currentStaleAfter = Asset.selectAll().where { Asset.id eq assetUuid }.first()[Asset.staleAfter]
-                val newStaleAfter = if (currentStaleAfter == 0L || txTimestamp < currentStaleAfter) txTimestamp else currentStaleAfter
+                val newStaleAfter =
+                    if (currentStaleAfter == 0L || txTimestamp < currentStaleAfter) txTimestamp else currentStaleAfter
                 Asset.update({ Asset.id eq assetUuid }) {
                     it[Asset.staleAfter] = newStaleAfter
                 }
@@ -132,7 +137,7 @@ class AssetTransactionController(
         }
 
         val jobId = scheduler.enqueue(RecomputeAssetAggregationRequest(assetUuid))
-        logger.info("Deleted transaction $transactionUuid, scheduled RecomputeAssetAggregationRequest $jobId for asset $assetUuid")
+        logger.info { "Deleted transaction $transactionUuid, scheduled RecomputeAssetAggregationRequest $jobId for asset $assetUuid" }
 
         return DeleteTransactionResponse(
             transactionId = transactionUuid,

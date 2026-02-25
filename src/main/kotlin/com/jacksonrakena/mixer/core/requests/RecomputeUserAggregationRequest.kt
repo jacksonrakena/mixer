@@ -1,18 +1,20 @@
 package com.jacksonrakena.mixer.core.requests
 
-import com.jacksonrakena.mixer.cache.RateCache
 import com.jacksonrakena.mixer.data.UserAggregationManager
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jobrunr.jobs.lambdas.JobRequest
 import org.jobrunr.jobs.lambdas.JobRequestHandler
+import org.slf4j.MDC
 import org.springframework.stereotype.Component
-import java.util.logging.Logger
 import kotlin.uuid.Uuid
 
+private val logger = KotlinLogging.logger {}
+
 @Serializable
-class RecomputeUserAggregationRequest(val userId: Uuid): JobRequest {
+class RecomputeUserAggregationRequest(val userId: Uuid) : JobRequest {
     override fun getJobRequestHandler(): Class<out JobRequestHandler<*>?> {
         return RecomputeUserAggregationRequestHandler::class.java
     }
@@ -24,17 +26,18 @@ class RecomputeUserAggregationRequest(val userId: Uuid): JobRequest {
     ) : JobRequestHandler<RecomputeUserAggregationRequest> {
         override fun run(request: RecomputeUserAggregationRequest?) {
             if (request == null) {
-                logger.warning("Received null request for RecomputeUserAggregationRequestHandler")
+                logger.warn { "Received null request for RecomputeUserAggregationRequestHandler" }
                 return
             }
 
-            runBlocking {
-                userAggregationManager.forceAggregateUserAssets(request.userId)
+            MDC.put("userId", request.userId.toString())
+            try {
+                runBlocking {
+                    userAggregationManager.forceAggregateUserAssets(request.userId)
+                }
+            } finally {
+                MDC.remove("userId")
             }
-        }
-
-        companion object {
-            val logger = Logger.getLogger(RateCache::class.java.name)
         }
     }
 }

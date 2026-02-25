@@ -1,8 +1,8 @@
 package com.jacksonrakena.mixer.core.requests
 
-import com.jacksonrakena.mixer.cache.RateCache
 import com.jacksonrakena.mixer.data.tables.markets.ExchangeRate
 import com.jacksonrakena.mixer.upstream.CurrencyService
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.toKotlinLocalDate
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.jdbc.Database
@@ -10,10 +10,11 @@ import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jobrunr.jobs.lambdas.JobRequest
 import org.jobrunr.jobs.lambdas.JobRequestHandler
+import org.slf4j.MDC
 import org.springframework.stereotype.Component
 import java.time.ZoneOffset
-import java.util.logging.Level
-import java.util.logging.Logger
+
+private val logger = KotlinLogging.logger {}
 
 @Serializable
 data class BackfillCurrencyPairRequest(val base: String, val counter: String): JobRequest {
@@ -28,12 +29,11 @@ data class BackfillCurrencyPairRequest(val base: String, val counter: String): J
     ) : JobRequestHandler<BackfillCurrencyPairRequest> {
         override fun run(request: BackfillCurrencyPairRequest?) {
             if (request == null) {
-                logger.warning("Received null request for BackfillCurrencyPairRequestHandler")
+                logger.warn { "Received null request for BackfillCurrencyPairRequestHandler" }
                 return
             }
 
-//        logger.info("Processing backfill request for ${request.base}/${request.counter}")
-
+            MDC.put("currencyPair", "${request.base}/${request.counter}")
             try {
                 val rate = currencyService.getHistoricExchangeRates(Pair(request.base, request.counter))
 
@@ -48,17 +48,11 @@ data class BackfillCurrencyPairRequest(val base: String, val counter: String): J
                         }
                     }
                 }
-//            logger.info("Successfully backfilled currency pair ${request.base}/${request.counter}\n" +
-//                    "${transaction { ExchangeRate.select(ExchangeRate.referenceDate.count()).count()}} records total.")
             } catch (e: Error) {
-                logger.log(Level.SEVERE, e) {
-                    "failed to fetch currency pair ${request.base}/${request.counter}"
-                }
+                logger.error(e) { "failed to fetch currency pair ${request.base}/${request.counter}" }
+            } finally {
+                MDC.remove("currencyPair")
             }
-        }
-
-        companion object {
-            val logger = Logger.getLogger(RateCache::class.java.name)
         }
     }
 }

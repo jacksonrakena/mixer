@@ -14,7 +14,6 @@ object AssetAggregate: Table("generated_asset_aggregate") {
 
     val created = long("created").clientDefault { System.currentTimeMillis() }
 
-    val deltaCapitalGains = double("delta_capital_gains").default(0.0)
     val deltaReconciliation = double("delta_reconciliation").default(0.0)
     val deltaTrades = double("delta_trades").default(0.0)
     val deltaOther = double("delta_other").default(0.0)

@@ -3,7 +3,9 @@ import Box from '@mui/joy/Box'
 import Typography from '@mui/joy/Typography'
 import Sheet from '@mui/joy/Sheet'
 import Divider from '@mui/joy/Divider'
-import { fetchAssets, type AssetDto } from './api'
+import Select from '@mui/joy/Select'
+import Option from '@mui/joy/Option'
+import { fetchAssets, SUPPORTED_CURRENCIES, type AssetDto, type SupportedCurrency } from './api'
 import { AssetList } from './AssetList'
 import { AssetChart } from './AssetChart'
 import { TransactionPanel } from './TransactionPanel'
@@ -13,6 +15,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loadingAssets, setLoadingAssets] = useState(true)
   const [staleAfterMap, setStaleAfterMap] = useState<Record<string, number>>({})
+  const [displayCurrency, setDisplayCurrency] = useState<SupportedCurrency>('AUD')
 
   useEffect(() => {
     fetchAssets()
@@ -126,6 +129,61 @@ export default function App() {
             overflow: 'auto',
           }}
         >
+          {/* Currency selector */}
+          <Typography
+            level="body-xs"
+            sx={{ color: 'neutral.500', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.75, fontWeight: 600 }}
+          >
+            Display Currency
+          </Typography>
+          <Select
+            value={displayCurrency}
+            onChange={(_, val) => val && setDisplayCurrency(val as SupportedCurrency)}
+            size="sm"
+            sx={{
+              mb: 2,
+              background: 'rgba(99,102,241,0.08)',
+              border: '1px solid rgba(99,102,241,0.2)',
+              color: 'white',
+              fontWeight: 600,
+              fontSize: '13px',
+              borderRadius: '10px',
+              '& .MuiSelect-indicator': { color: 'rgba(255,255,255,0.4)' },
+              '&:hover': {
+                background: 'rgba(99,102,241,0.14)',
+                borderColor: 'rgba(99,102,241,0.35)',
+              },
+            }}
+            slotProps={{
+              listbox: {
+                sx: {
+                  background: 'rgba(17,24,39,0.95)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  backdropFilter: 'blur(16px)',
+                  borderRadius: '10px',
+                  '& .MuiOption-root': {
+                    color: 'white',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    '&:hover': { background: 'rgba(99,102,241,0.15)' },
+                    '&[aria-selected="true"]': {
+                      background: 'rgba(99,102,241,0.25)',
+                      fontWeight: 700,
+                    },
+                  },
+                },
+              },
+            }}
+          >
+            {SUPPORTED_CURRENCIES.map((cur) => (
+              <Option key={cur} value={cur}>
+                {cur}
+              </Option>
+            ))}
+          </Select>
+
+          <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', mb: 1.5 }} />
+
           <Typography
             level="body-xs"
             sx={{ color: 'neutral.500', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 1.5, fontWeight: 600 }}
@@ -152,6 +210,7 @@ export default function App() {
                 assetName={selectedAsset.name}
                 currency={selectedAsset.currency}
                 staleAfter={staleAfterMap[selectedAsset.id] ?? 0}
+                displayCurrency={displayCurrency}
               />
 
               {/* Transactions panel */}

@@ -1,5 +1,5 @@
 // API base URL - proxied through Vite dev server
-const BASE = '/api';
+const BASE = "/api";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,7 +26,7 @@ export interface DeleteAssetResponse {
   deleted: boolean;
 }
 
-export type TransactionType = 'Trade' | 'Reconciliation';
+export type TransactionType = "Trade" | "Reconciliation";
 
 export interface CreateTransactionRequest {
   type: TransactionType;
@@ -50,19 +50,30 @@ export interface DeleteTransactionResponse {
   staleAfter: number; // epoch millis
 }
 
+export interface FxConversionInfo {
+  rate: number;
+  fromCurrency: string;
+  toCurrency: string;
+  rateDate: string; // ISO local date (YYYY-MM-DD)
+}
+
 export interface AssetAggregation {
   assetId: string;
   date: string; // ISO instant string
   amount: number;
-  amountDeltaCapitalGains: number;
   amountDeltaTrades: number;
   amountDeltaReconciliation: number;
   amountDeltaOther: number;
-  value: number;
-  valueDeltaCapitalGains: number;
-  valueDeltaTrades: number;
-  valueDeltaReconciliation: number;
-  valueDeltaOther: number;
+  /** Value in the asset's native currency */
+  nativeValue: number;
+  /** Value converted to the user's display currency, or null if no FX rate was available */
+  displayValue: number | null;
+  /** The asset's native currency code */
+  nativeCurrency: string | null;
+  /** The user's display currency code */
+  displayCurrency: string | null;
+  /** FX conversion details, or null if no conversion was needed or no rate was available */
+  fxConversion: FxConversionInfo | null;
 }
 
 // ── Assets ───────────────────────────────────────────────────────────────────
@@ -73,18 +84,22 @@ export async function fetchAssets(): Promise<AssetDto[]> {
   return res.json();
 }
 
-export async function createAsset(req: CreateAssetRequest): Promise<CreateAssetResponse> {
+export async function createAsset(
+  req: CreateAssetRequest,
+): Promise<CreateAssetResponse> {
   const res = await fetch(`${BASE}/asset`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
   });
   if (!res.ok) throw new Error(`Failed to create asset: ${res.status}`);
   return res.json();
 }
 
-export async function deleteAsset(assetId: string): Promise<DeleteAssetResponse> {
-  const res = await fetch(`${BASE}/asset/${assetId}`, { method: 'DELETE' });
+export async function deleteAsset(
+  assetId: string,
+): Promise<DeleteAssetResponse> {
+  const res = await fetch(`${BASE}/asset/${assetId}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Failed to delete asset: ${res.status}`);
   return res.json();
 }
@@ -96,8 +111,8 @@ export async function createTransaction(
   req: CreateTransactionRequest,
 ): Promise<CreateTransactionResponse> {
   const res = await fetch(`${BASE}/asset/${assetId}/transaction`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
   });
   if (!res.ok) throw new Error(`Failed to create transaction: ${res.status}`);
@@ -108,9 +123,12 @@ export async function deleteTransaction(
   assetId: string,
   transactionId: string,
 ): Promise<DeleteTransactionResponse> {
-  const res = await fetch(`${BASE}/asset/${assetId}/transaction/${transactionId}`, {
-    method: 'DELETE',
-  });
+  const res = await fetch(
+    `${BASE}/asset/${assetId}/transaction/${transactionId}`,
+    {
+      method: "DELETE",
+    },
+  );
   if (!res.ok) throw new Error(`Failed to delete transaction: ${res.status}`);
   return res.json();
 }
@@ -139,7 +157,9 @@ export async function fetchTransactions(
   page: number = 0,
   size: number = 10,
 ): Promise<PaginatedTransactionsResponse> {
-  const res = await fetch(`${BASE}/asset/${assetId}/transaction?page=${page}&size=${size}`);
+  const res = await fetch(
+    `${BASE}/asset/${assetId}/transaction?page=${page}&size=${size}`,
+  );
   if (!res.ok) throw new Error(`Failed to fetch transactions: ${res.status}`);
   return res.json();
 }
@@ -150,19 +170,42 @@ export async function fetchAggregation(
   assetId: string,
   start: string,
   end: string,
+  displayCurrency?: string,
 ): Promise<AssetAggregation[]> {
-  const res = await fetch(`${BASE}/agg/asset/${assetId}/${start}/${end}`);
+  const params = displayCurrency
+    ? `?displayCurrency=${encodeURIComponent(displayCurrency)}`
+    : "";
+  const res = await fetch(
+    `${BASE}/agg/asset/${assetId}/${start}/${end}${params}`,
+  );
   if (!res.ok) throw new Error(`Failed to fetch aggregation: ${res.status}`);
   return res.json();
 }
 
 export async function fetchAllAggregations(
   assetId: string,
+  displayCurrency?: string,
 ): Promise<AssetAggregation[]> {
-  const res = await fetch(`${BASE}/agg/asset/${assetId}/all`);
-  if (!res.ok) throw new Error(`Failed to fetch all aggregations: ${res.status}`);
+  const params = displayCurrency
+    ? `?displayCurrency=${encodeURIComponent(displayCurrency)}`
+    : "";
+  const res = await fetch(`${BASE}/agg/asset/${assetId}/all${params}`);
+  if (!res.ok)
+    throw new Error(`Failed to fetch all aggregations: ${res.status}`);
   return res.json();
 }
+
+// ── Supported currencies ─────────────────────────────────────────────────────
+
+export const SUPPORTED_CURRENCIES = [
+  "AUD",
+  "USD",
+  "NZD",
+  "EUR",
+  "GBP",
+  "HKD",
+] as const;
+export type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number];
 
 // ── Staleness ─────────────────────────────────────────────────────────────────
 
@@ -171,7 +214,9 @@ export interface AssetStalenessResponse {
   staleAfter: number; // epoch millis, 0 = not stale
 }
 
-export async function fetchAssetStaleness(assetId: string): Promise<AssetStalenessResponse> {
+export async function fetchAssetStaleness(
+  assetId: string,
+): Promise<AssetStalenessResponse> {
   const res = await fetch(`${BASE}/asset/${assetId}/staleness`);
   if (!res.ok) throw new Error(`Failed to fetch staleness: ${res.status}`);
   return res.json();
@@ -181,7 +226,7 @@ export async function fetchAssetStaleness(assetId: string): Promise<AssetStalene
 
 /** Returns YYYY-MM-DD for a Date object */
 export function toLocalDateString(d: Date): string {
-  return d.toISOString().split('T')[0];
+  return d.toISOString().split("T")[0];
 }
 
 /** Returns a date N days ago as YYYY-MM-DD */

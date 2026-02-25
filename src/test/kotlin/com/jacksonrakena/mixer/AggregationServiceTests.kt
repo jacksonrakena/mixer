@@ -92,13 +92,13 @@ class AggregationServiceTests {
             )
 
             result shouldBe listOf(
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-12T12:59:00Z"), amount=10.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-13T12:59:00Z"), amount=9.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-14T12:59:00Z"), amount=11.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-15T12:59:00Z"), amount=11.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-16T12:59:00Z"), amount=11.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-17T12:59:00Z"), amount=13.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-18T12:59:00Z"), amount=13.0),
+                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-12T12:59:00Z"), amount=10.0, nativeValue=10.0, amountDeltaTrades=10.0),
+                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-13T12:59:00Z"), amount=9.0, nativeValue=9.0, amountDeltaTrades=-1.0),
+                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-14T12:59:00Z"), amount=11.0, nativeValue=11.0, amountDeltaReconciliation=11.0),
+                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-15T12:59:00Z"), amount=11.0, nativeValue=11.0),
+                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-16T12:59:00Z"), amount=11.0, nativeValue=11.0),
+                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-17T12:59:00Z"), amount=13.0, nativeValue=13.0, amountDeltaTrades=2.0),
+                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-18T12:59:00Z"), amount=13.0, nativeValue=13.0),
             )
         }
 
@@ -151,37 +151,48 @@ class AggregationServiceTests {
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-12T12:59:00Z"),
-                    amount = 10.0
+                    amount = 10.0,
+                    nativeValue = 10.0,
+                    amountDeltaReconciliation = 10.0,
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-13T12:59:00Z"),
-                    amount = 0.0
+                    amount = 0.0,
+                    nativeValue = 0.0,
+                    amountDeltaReconciliation = 0.0,
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-14T12:59:00Z"),
-                    amount = 11.0
+                    amount = 11.0,
+                    nativeValue = 11.0,
+                    amountDeltaReconciliation = 11.0,
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-15T12:59:00Z"),
-                    amount = 11.0
+                    amount = 11.0,
+                    nativeValue = 11.0,
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-16T12:59:00Z"),
-                    amount = 11.0
+                    amount = 11.0,
+                    nativeValue = 11.0,
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-17T12:59:00Z"),
-                    amount = 2.0
+                    amount = 2.0,
+                    nativeValue = 2.0,
+                    amountDeltaReconciliation = 2.0,
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-18T12:59:00Z"),
-                    amount = 2.0
+                    amount = 2.0,
+                    nativeValue = 2.0,
                 )
             )
         }
@@ -242,37 +253,48 @@ class AggregationServiceTests {
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-12T12:59:00Z"),
-                    amount = 10.0
+                    amount = 10.0,
+                    nativeValue = 10.0,
+                    amountDeltaTrades = 10.0,
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-13T12:59:00Z"),
-                    amount = 9.0
+                    amount = 9.0,
+                    nativeValue = 9.0,
+                    amountDeltaTrades = -1.0,
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-14T12:59:00Z"),
-                    amount = 9.0
+                    amount = 9.0,
+                    nativeValue = 9.0,
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-15T12:59:00Z"),
-                    amount = 13.0
+                    amount = 13.0,
+                    nativeValue = 13.0,
+                    amountDeltaReconciliation = 11.0,
+                    amountDeltaTrades = 2.0,
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-16T12:59:00Z"),
-                    amount = 13.0
+                    amount = 13.0,
+                    nativeValue = 13.0,
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-17T12:59:00Z"),
-                    amount = 13.0
+                    amount = 13.0,
+                    nativeValue = 13.0,
                 ),
                 AssetTransactionAggregation(
                     assetId = testAsset,
                     date = Instant.parse("2026-02-18T12:59:00Z"),
-                    amount = 13.0
+                    amount = 13.0,
+                    nativeValue = 13.0,
                 )
             )
         }
