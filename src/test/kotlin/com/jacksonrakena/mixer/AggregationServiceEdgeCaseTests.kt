@@ -2,7 +2,6 @@ package com.jacksonrakena.mixer
 
 import com.jacksonrakena.mixer.data.AggregationService
 import com.jacksonrakena.mixer.data.AssetTransaction
-import com.jacksonrakena.mixer.data.AssetTransactionAggregation
 import com.jacksonrakena.mixer.data.AssetTransactionType
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -14,7 +13,6 @@ import kotlinx.datetime.toLocalDateTime
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlin.uuid.Uuid

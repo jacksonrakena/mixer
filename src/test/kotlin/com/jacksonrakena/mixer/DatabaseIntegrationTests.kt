@@ -1,6 +1,5 @@
 package com.jacksonrakena.mixer
 
-import com.jacksonrakena.mixer.data.AggregationPeriod
 import com.jacksonrakena.mixer.data.AggregationService
 import com.jacksonrakena.mixer.data.AssetTransactionType
 import com.jacksonrakena.mixer.data.UserAggregationManager
@@ -16,6 +15,7 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.SchemaUtils
@@ -367,6 +367,107 @@ class DatabaseIntegrationTests {
             second[AssetAggregate.totalValue] shouldBeExactly 18.0
             second[AssetAggregate.deltaReconciliation] shouldBeExactly 15.0
             second[AssetAggregate.deltaTrades] shouldBeExactly 3.0
+        }
+
+        @Test
+        fun `regenerateAggregatesForAsset sets aggregatedThrough to today`() = runTest {
+            insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
+
+            val manager = UserAggregationManager(db, AggregationService())
+            manager.regenerateAggregatesForAsset(assetId)
+
+            val aggregatedThrough = transaction(db) {
+                Asset.selectAll().where { Asset.id eq assetId }.first()[Asset.aggregatedThrough]
+            }
+            val today = kotlinx.datetime.Clock.System.now()
+                .toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault()).date
+            aggregatedThrough shouldBe today
+        }
+
+        @Test
+        fun `aggregatedThrough is null before any aggregation`() = runTest {
+            val aggregatedThrough = transaction(db) {
+                Asset.selectAll().where { Asset.id eq assetId }.first()[Asset.aggregatedThrough]
+            }
+            aggregatedThrough.shouldBeNull()
+        }
+
+        @Test
+        fun `ensureAllAggregationsUpToDate regenerates assets with null aggregatedThrough`() = runTest {
+            insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
+
+            val manager = UserAggregationManager(db, AggregationService())
+            manager.ensureAllAggregationsUpToDate()
+
+            val count = transaction(db) {
+                AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
+            }
+            (count > 0) shouldBe true
+
+            val aggregatedThrough = transaction(db) {
+                Asset.selectAll().where { Asset.id eq assetId }.first()[Asset.aggregatedThrough]
+            }
+            aggregatedThrough.shouldNotBeNull()
+        }
+
+        @Test
+        fun `ensureAllAggregationsUpToDate skips assets already aggregated through today`() = runTest {
+            insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
+
+            val manager = UserAggregationManager(db, AggregationService())
+            // First call aggregates
+            manager.regenerateAggregatesForAsset(assetId)
+
+            val countAfterFirst = transaction(db) {
+                AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
+            }
+
+            // Manually verify aggregatedThrough is today
+            val today = kotlinx.datetime.Clock.System.now()
+                .toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault()).date
+            val aggregatedThrough = transaction(db) {
+                Asset.selectAll().where { Asset.id eq assetId }.first()[Asset.aggregatedThrough]
+            }
+            aggregatedThrough shouldBe today
+
+            // ensureAllAggregationsUpToDate should be a no-op since already up-to-date
+            manager.ensureAllAggregationsUpToDate()
+
+            val countAfterEnsure = transaction(db) {
+                AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
+            }
+            countAfterEnsure shouldBe countAfterFirst
+        }
+
+        @Test
+        fun `ensureAllAggregationsUpToDate handles assets with no transactions gracefully`() = runTest {
+            // assetId has no transactions
+            val manager = UserAggregationManager(db, AggregationService())
+            manager.ensureAllAggregationsUpToDate()
+
+            val count = transaction(db) {
+                AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
+            }
+            count shouldBe 0
+        }
+
+        @Test
+        fun `ensureAllAggregationsUpToDate refreshes multiple stale assets`() = runTest {
+            insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
+            insertTx(otherAssetId, baseTime, AssetTransactionType.Trade, 20.0, 200.0)
+
+            val manager = UserAggregationManager(db, AggregationService())
+            manager.ensureAllAggregationsUpToDate()
+
+            val assetAggs = transaction(db) {
+                AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
+            }
+            val otherAggs = transaction(db) {
+                AssetAggregate.selectAll().where { AssetAggregate.assetId eq otherAssetId }.count()
+            }
+
+            (assetAggs > 0) shouldBe true
+            (otherAggs > 0) shouldBe true
         }
     }
 }

@@ -5,7 +5,6 @@ import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
-import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
@@ -14,20 +13,6 @@ import org.jetbrains.exposed.v1.core.lessEq
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.springframework.stereotype.Component
-
-/**
- * Result of an exchange rate lookup, including the rate and the actual date
- * of the rate record used (which may differ from the requested date if
- * the exact date was missing from the source data).
- */
-@Serializable
-data class ExchangeRateLookup(
-    val rate: Double,
-    val base: String,
-    val counter: String,
-    val requestedDate: LocalDate,
-    val actualDate: LocalDate,
-)
 
 /**
  * Helper for querying exchange rates directly from the database,
