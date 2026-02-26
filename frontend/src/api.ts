@@ -325,3 +325,61 @@ export async function fetchAdminUsers(): Promise<UserResponse[]> {
   if (!res.ok) throw new Error(`Failed to fetch users: ${res.status}`);
   return res.json();
 }
+
+export interface AdminCreateUserRequest {
+  email: string;
+  password: string;
+  displayName: string;
+  emailVerified?: boolean;
+}
+
+export async function adminCreateUser(
+  request: AdminCreateUserRequest,
+): Promise<UserResponse> {
+  const res = await fetch(`${BASE}/admin/users`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message || `Failed to create user: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function adminDeleteUser(userId: string): Promise<void> {
+  const res = await fetch(`${BASE}/admin/users/${userId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message || `Failed to delete user: ${res.status}`);
+  }
+}
+
+export async function adminForceReaggregateAll(): Promise<{
+  status: string;
+  usersProcessed: number;
+}> {
+  const res = await fetch(`${BASE}/admin/aggregations/force-all`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(`Failed to reaggregate: ${res.status}`);
+  return res.json();
+}
+
+export interface EntityCounts {
+  users: number;
+  assets: number;
+  transactions: number;
+  aggregates: number;
+  exchangeRates: number;
+  userRoles: number;
+}
+
+export async function adminFetchDebugCounts(): Promise<EntityCounts> {
+  const res = await fetch(`${BASE}/admin/debug/counts`);
+  if (!res.ok) throw new Error(`Failed to fetch counts: ${res.status}`);
+  return res.json();
+}

@@ -43,17 +43,15 @@ export default function ProfilePage() {
 
   return (
     <Box sx={{ maxWidth: 600, mx: 'auto', py: 4, px: 2 }}>
-      <Typography level="h3" sx={{ color: 'white', fontWeight: 700, mb: 3 }}>
+      <Typography level="h3" sx={{ fontWeight: 700, mb: 3 }}>
         Profile
       </Typography>
 
       <Sheet
+        variant="outlined"
         sx={{
           p: 3,
           borderRadius: '16px',
-          background: 'rgba(17,24,39,0.6)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          backdropFilter: 'blur(12px)',
           mb: 3,
         }}
       >
@@ -62,7 +60,7 @@ export default function ProfilePage() {
         </Typography>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-          <Typography level="body-md" sx={{ color: 'neutral.300' }}>
+          <Typography level="body-md">
             {user.email}
           </Typography>
           <Chip
@@ -84,18 +82,16 @@ export default function ProfilePage() {
           </Box>
         )}
 
-        <Typography level="body-xs" sx={{ color: 'neutral.600', mt: 1 }}>
+        <Typography level="body-xs" sx={{ color: 'neutral.500', mt: 1 }}>
           Member since {new Date(user.createdAt).toLocaleDateString()}
         </Typography>
       </Sheet>
 
       <Sheet
+        variant="outlined"
         sx={{
           p: 3,
           borderRadius: '16px',
-          background: 'rgba(17,24,39,0.6)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          backdropFilter: 'blur(12px)',
         }}
       >
         <Typography level="body-xs" sx={{ color: 'neutral.500', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 2, fontWeight: 600 }}>
@@ -121,7 +117,7 @@ export default function ProfilePage() {
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             required
-            sx={{ mb: 2, background: 'rgba(255,255,255,0.05)', color: 'white' }}
+            sx={{ mb: 2 }}
           />
 
           <Typography level="body-sm" sx={{ color: 'neutral.400', mb: 0.5 }}>
@@ -130,7 +126,7 @@ export default function ProfilePage() {
           <Input
             value={timezone}
             onChange={(e) => setTimezone(e.target.value)}
-            sx={{ mb: 2, background: 'rgba(255,255,255,0.05)', color: 'white' }}
+            sx={{ mb: 2 }}
           />
 
           <Typography level="body-sm" sx={{ color: 'neutral.400', mb: 0.5 }}>
@@ -140,7 +136,7 @@ export default function ProfilePage() {
             value={displayCurrency}
             onChange={(_, val) => val && setDisplayCurrency(val as SupportedCurrency)}
             size="sm"
-            sx={{ mb: 3, background: 'rgba(255,255,255,0.05)', color: 'white' }}
+            sx={{ mb: 3 }}
           >
             {SUPPORTED_CURRENCIES.map((cur) => (
               <Option key={cur} value={cur}>
@@ -149,13 +145,13 @@ export default function ProfilePage() {
             ))}
           </Select>
 
-          <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', mb: 2 }} />
+          <Divider sx={{ mb: 2 }} />
 
           <Button
             type="submit"
             loading={saving}
             sx={{
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
               fontWeight: 700,
             }}
           >

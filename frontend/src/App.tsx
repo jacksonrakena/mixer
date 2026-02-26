@@ -64,7 +64,7 @@ export default function App({ page }: AppProps) {
     <Box
       sx={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #0a0e1a 0%, #0d1224 50%, #0a0e1a 100%)',
+        bgcolor: 'background.body',
         display: 'flex',
         flexDirection: 'column',
       }}
@@ -72,10 +72,11 @@ export default function App({ page }: AppProps) {
       {/* Top nav */}
       <Sheet
         component="header"
+        variant="outlined"
         sx={{
-          background: 'rgba(17,24,39,0.8)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          backdropFilter: 'blur(12px)',
+          borderTop: 'none',
+          borderLeft: 'none',
+          borderRight: 'none',
           position: 'sticky',
           top: 0,
           zIndex: 100,
@@ -87,32 +88,31 @@ export default function App({ page }: AppProps) {
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          {/* Logo mark */}
           <Box
             sx={{
               width: 30,
               height: 30,
               borderRadius: '8px',
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '14px',
               fontWeight: 800,
               color: 'white',
-              boxShadow: '0 0 16px rgba(99,102,241,0.4)',
+              boxShadow: '0 0 12px rgba(37,99,235,0.3)',
             }}
           >
             M
           </Box>
           <Typography
             level="title-md"
-            sx={{ color: 'white', fontWeight: 700, letterSpacing: '-0.3px' }}
+            sx={{ fontWeight: 700, letterSpacing: '-0.3px' }}
           >
             Mixer
           </Typography>
         </Box>
-        <Divider orientation="vertical" sx={{ borderColor: 'rgba(255,255,255,0.08)', mx: 0.5 }} />
+        <Divider orientation="vertical" sx={{ mx: 0.5 }} />
         <Typography level="body-xs" sx={{ color: 'neutral.500' }}>
           Portfolio Tracker
         </Typography>
@@ -123,10 +123,9 @@ export default function App({ page }: AppProps) {
             <MenuButton
               variant="plain"
               sx={{
-                color: 'neutral.300',
+                color: 'neutral.700',
                 fontWeight: 600,
                 fontSize: '13px',
-                '&:hover': { background: 'rgba(255,255,255,0.06)' },
                 borderRadius: '8px',
                 px: 1.5,
               }}
@@ -135,18 +134,7 @@ export default function App({ page }: AppProps) {
             </MenuButton>
             <Menu
               placement="bottom-end"
-              sx={{
-                background: 'rgba(17,24,39,0.95)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                backdropFilter: 'blur(16px)',
-                borderRadius: '10px',
-                minWidth: 160,
-                '& .MuiMenuItem-root': {
-                  color: 'white',
-                  fontSize: '13px',
-                  '&:hover': { background: 'rgba(99,102,241,0.15)' },
-                },
-              }}
+              sx={{ minWidth: 160, borderRadius: '10px' }}
             >
               <MenuItem onClick={() => navigate('/')}>
                 <ListItemDecorator>📊</ListItemDecorator>
@@ -162,13 +150,13 @@ export default function App({ page }: AppProps) {
                   Admin
                 </MenuItem>
               )}
-              <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
+              <Divider />
               <MenuItem
                 onClick={async () => {
                   await logout()
                   navigate('/login', { replace: true })
                 }}
-                sx={{ color: 'danger.400 !important' }}
+                color="danger"
               >
                 <ListItemDecorator>🚪</ListItemDecorator>
                 Sign out
@@ -198,13 +186,11 @@ export default function App({ page }: AppProps) {
       >
         {/* Left sidebar — Asset list */}
         <Sheet
+          variant="outlined"
           sx={{
             width: 260,
             flexShrink: 0,
             borderRadius: '16px',
-            background: 'rgba(17,24,39,0.6)',
-            border: '1px solid rgba(255,255,255,0.07)',
-            backdropFilter: 'blur(12px)',
             p: 2,
             position: 'sticky',
             top: 72,
@@ -225,37 +211,9 @@ export default function App({ page }: AppProps) {
             size="sm"
             sx={{
               mb: 2,
-              background: 'rgba(99,102,241,0.08)',
-              border: '1px solid rgba(99,102,241,0.2)',
-              color: 'white',
               fontWeight: 600,
               fontSize: '13px',
               borderRadius: '10px',
-              '& .MuiSelect-indicator': { color: 'rgba(255,255,255,0.4)' },
-              '&:hover': {
-                background: 'rgba(99,102,241,0.14)',
-                borderColor: 'rgba(99,102,241,0.35)',
-              },
-            }}
-            slotProps={{
-              listbox: {
-                sx: {
-                  background: 'rgba(17,24,39,0.95)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  backdropFilter: 'blur(16px)',
-                  borderRadius: '10px',
-                  '& .MuiOption-root': {
-                    color: 'white',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    '&:hover': { background: 'rgba(99,102,241,0.15)' },
-                    '&[aria-selected="true"]': {
-                      background: 'rgba(99,102,241,0.25)',
-                      fontWeight: 700,
-                    },
-                  },
-                },
-              },
             }}
           >
             {SUPPORTED_CURRENCIES.map((cur) => (
@@ -265,7 +223,7 @@ export default function App({ page }: AppProps) {
             ))}
           </Select>
 
-          <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', mb: 1.5 }} />
+          <Divider sx={{ mb: 1.5 }} />
 
           <Typography
             level="body-xs"
@@ -298,12 +256,13 @@ export default function App({ page }: AppProps) {
 
               {/* Transactions panel */}
               <Sheet
+                variant="outlined"
                 sx={{
                   borderRadius: '16px',
-                  background: 'rgba(17,24,39,0.6)',
-                  border: '1px solid rgba(255,255,255,0.07)',
-                  backdropFilter: 'blur(12px)',
                   p: 2.5,
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
                 }}
               >
                 <Typography
@@ -342,8 +301,9 @@ export default function App({ page }: AppProps) {
                   width: 64,
                   height: 64,
                   borderRadius: '20px',
-                  background: 'rgba(99,102,241,0.12)',
-                  border: '1px solid rgba(99,102,241,0.2)',
+                  bgcolor: 'primary.50',
+                  border: '1px solid',
+                  borderColor: 'primary.200',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -352,10 +312,10 @@ export default function App({ page }: AppProps) {
               >
                 📈
               </Box>
-              <Typography level="title-md" sx={{ color: 'neutral.300' }}>
+              <Typography level="title-md" sx={{ color: 'neutral.700' }}>
                 No asset selected
               </Typography>
-              <Typography level="body-sm" sx={{ color: 'neutral.600', textAlign: 'center', maxWidth: 300 }}>
+              <Typography level="body-sm" sx={{ color: 'neutral.500', textAlign: 'center', maxWidth: 300 }}>
                 {loadingAssets
                   ? 'Loading your assets…'
                   : 'Create an asset in the sidebar to get started.'}

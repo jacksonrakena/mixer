@@ -1,18 +1,53 @@
 package com.jacksonrakena.mixer.controller.admin
 
 import com.jacksonrakena.mixer.controller.auth.UserResponse
+import com.jacksonrakena.mixer.data.UserAggregationManager
+import com.jacksonrakena.mixer.data.tables.concrete.Asset
+import com.jacksonrakena.mixer.data.tables.concrete.Transaction
 import com.jacksonrakena.mixer.data.tables.concrete.User
 import com.jacksonrakena.mixer.data.tables.concrete.UserRole
+import com.jacksonrakena.mixer.data.tables.virtual.AssetAggregate
+import com.jacksonrakena.mixer.data.tables.markets.ExchangeRate
+import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
+import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.http.HttpStatus
+import org.springframework.security.crypto.password.PasswordEncoder
+import org.springframework.web.bind.annotation.*
+import org.springframework.web.server.ResponseStatusException
+import kotlin.uuid.Uuid
+
+private val logger = KotlinLogging.logger {}
+
+@Serializable
+data class AdminCreateUserRequest(
+    val email: String,
+    val password: String,
+    val displayName: String,
+    val emailVerified: Boolean = false,
+)
+
+@Serializable
+data class EntityCounts(
+    val users: Long,
+    val assets: Long,
+    val transactions: Long,
+    val aggregates: Long,
+    val exchangeRates: Long,
+    val userRoles: Long,
+)
 
 @RestController
 @RequestMapping("/admin")
-class AdminController {
+class AdminController(
+    private val passwordEncoder: PasswordEncoder,
+    private val userAggregationManager: UserAggregationManager,
+) {
 
     @GetMapping("/users")
     fun listUsers(): List<UserResponse> {
@@ -32,6 +67,102 @@ class AdminController {
                     createdAt = row[User.createdAt],
                 )
             }
+        }
+    }
+
+    @PostMapping("/users")
+    fun createUser(@RequestBody request: AdminCreateUserRequest): UserResponse {
+        if (request.email.isBlank() || !request.email.contains("@")) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid email")
+        }
+        if (request.password.length < 8) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at least 8 characters")
+        }
+        if (request.displayName.isBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Display name is required")
+        }
+
+        val existing = transaction {
+            User.selectAll().where { User.email eq request.email.lowercase().trim() }.firstOrNull()
+        }
+        if (existing != null) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Email already in use")
+        }
+
+        val now = System.currentTimeMillis()
+        val userId = transaction {
+            User.insert {
+                it[email] = request.email.lowercase().trim()
+                it[passwordHash] = passwordEncoder.encode(request.password)!!
+                it[displayName] = request.displayName.trim()
+                it[emailVerified] = request.emailVerified
+                it[createdAt] = now
+            }[User.id]
+        }
+
+        logger.info { "Admin created user: ${request.email} (id=$userId, verified=${request.emailVerified})" }
+
+        return UserResponse(
+            id = userId,
+            email = request.email.lowercase().trim(),
+            displayName = request.displayName.trim(),
+            emailVerified = request.emailVerified,
+            timezone = "Australia/Sydney",
+            displayCurrency = "AUD",
+            roles = emptyList(),
+            createdAt = now,
+        )
+    }
+
+    @DeleteMapping("/users/{userId}")
+    fun deleteUser(@PathVariable userId: Uuid): Map<String, Any> {
+        val exists = transaction {
+            User.selectAll().where { User.id eq userId }.firstOrNull()
+        } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "User not found")
+
+        transaction {
+            // Delete aggregates for user's assets
+            val assetIds = Asset.selectAll().where { Asset.ownerId eq userId }.map { it[Asset.id] }
+            for (assetId in assetIds) {
+                AssetAggregate.deleteWhere { AssetAggregate.assetId eq assetId }
+                Transaction.deleteWhere { Transaction.assetId eq assetId }
+            }
+            Asset.deleteWhere { Asset.ownerId eq userId }
+            UserRole.deleteWhere { UserRole.userId eq userId }
+            User.deleteWhere { User.id eq userId }
+        }
+
+        logger.info { "Admin deleted user: ${exists[User.email]} (id=$userId)" }
+        return mapOf("deleted" to true, "userId" to userId.toString())
+    }
+
+    @PostMapping("/aggregations/force-all")
+    fun forceReaggregateAll(): Map<String, Any> {
+        val userIds = transaction {
+            User.selectAll().map { it[User.id] }
+        }
+        logger.info { "Admin force reaggregating all users (${userIds.size} users)" }
+        var count = 0
+        runBlocking {
+            for (uid in userIds) {
+                userAggregationManager.forceAggregateUserAssets(uid)
+                count++
+            }
+        }
+        return mapOf("status" to "ok", "usersProcessed" to count)
+    }
+
+    @GetMapping("/debug/counts")
+    fun debugCounts(): EntityCounts {
+        return transaction {
+            EntityCounts(
+                users = User.selectAll().count(),
+                assets = Asset.selectAll().count(),
+                transactions = Transaction.selectAll().count(),
+                aggregates = AssetAggregate.selectAll().count(),
+                exchangeRates = ExchangeRate.selectAll().count(),
+                userRoles = UserRole.selectAll().count(),
+            )
         }
     }
 }

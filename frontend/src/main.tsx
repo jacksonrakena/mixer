@@ -15,18 +15,42 @@ import AdminPage from './pages/AdminPage.tsx'
 
 const theme = extendTheme({
   colorSchemes: {
-    dark: {
+    light: {
       palette: {
+        primary: {
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
+        },
         background: {
-          body: '#0a0e1a',
-          surface: '#111827',
+          body: '#f8fafc',
+          surface: '#ffffff',
+        },
+        neutral: {
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a',
         },
       },
     },
   },
   fontFamily: {
-    body: "'Inter', 'system-ui', sans-serif",
-    display: "'Inter', 'system-ui', sans-serif",
+    body: "'IBM Plex Sans', 'system-ui', sans-serif",
+    display: "'IBM Plex Sans', 'system-ui', sans-serif",
   },
 })
 
@@ -34,7 +58,7 @@ function ProtectedRoute() {
   const { user, loading } = useAuth()
   if (loading) {
     return (
-      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0e1a' }}>
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--joy-palette-background-body)' }}>
         <CircularProgress size="lg" />
       </Box>
     )
@@ -52,7 +76,7 @@ function PublicRoute() {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <CssVarsProvider theme={theme} defaultMode="dark">
+    <CssVarsProvider theme={theme} defaultMode="light">
       <CssBaseline />
       <BrowserRouter>
         <AuthProvider>

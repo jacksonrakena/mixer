@@ -9,9 +9,15 @@ import Option from '@mui/joy/Option'
 import FormLabel from '@mui/joy/FormLabel'
 import FormControl from '@mui/joy/FormControl'
 import Sheet from '@mui/joy/Sheet'
-import Divider from '@mui/joy/Divider'
 import Chip from '@mui/joy/Chip'
 import CircularProgress from '@mui/joy/CircularProgress'
+import Modal from '@mui/joy/Modal'
+import ModalDialog from '@mui/joy/ModalDialog'
+import DialogTitle from '@mui/joy/DialogTitle'
+import DialogContent from '@mui/joy/DialogContent'
+import DialogActions from '@mui/joy/DialogActions'
+import Divider from '@mui/joy/Divider'
+import Table from '@mui/joy/Table'
 import {
   createTransaction,
   deleteTransaction,
@@ -42,8 +48,31 @@ function formatDateTime(epochMs: number) {
   })
 }
 
+function formatFullDateTime(epochMs: number) {
+  return new Date(epochMs).toLocaleString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', second: '2-digit',
+    timeZoneName: 'short',
+  })
+}
+
+/** Build page numbers with ellipsis for large page counts. Always shows first, last, and neighbors of current. */
+function paginationRange(current: number, total: number): (number | 'ellipsis')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i)
+  const pages = new Set<number>()
+  pages.add(0)
+  pages.add(total - 1)
+  for (let i = Math.max(0, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.add(i)
+  const sorted = [...pages].sort((a, b) => a - b)
+  const result: (number | 'ellipsis')[] = []
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push('ellipsis')
+    result.push(sorted[i])
+  }
+  return result
+}
+
 export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPanelProps) => {
-  // Create form state
   const [type, setType] = useState<TransactionType>('Trade')
   const [amount, setAmount] = useState('')
   const [value, setValue] = useState('')
@@ -55,13 +84,13 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Transaction list state
   const [transactions, setTransactions] = useState<TransactionDto[]>([])
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [totalElements, setTotalElements] = useState(0)
   const [loadingList, setLoadingList] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [selectedTx, setSelectedTx] = useState<TransactionDto | null>(null)
 
   const loadTransactions = useCallback(async (p: number) => {
     setLoadingList(true)
@@ -101,7 +130,6 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
       setAmount('')
       setValue('')
       onTransactionChange(res.staleAfter)
-      // Reload current page to show updated list
       await loadTransactions(0)
       setPage(0)
     } catch (e) {
@@ -116,11 +144,11 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
     try {
       const res = await deleteTransaction(assetId, txId)
       onTransactionChange(res.staleAfter)
-      // Reload current page; if page is now empty, go back one page
       const newTotal = totalElements - 1
       const newTotalPages = Math.max(1, Math.ceil(newTotal / PAGE_SIZE))
       const targetPage = page >= newTotalPages ? Math.max(0, newTotalPages - 1) : page
       await loadTransactions(targetPage)
+      if (selectedTx?.id === txId) setSelectedTx(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete transaction')
     } finally {
@@ -134,33 +162,16 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minHeight: 0 }}>
       {/* Create form */}
-      <Sheet
-        variant="outlined"
-        sx={{
-          borderRadius: '12px',
-          p: 2,
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.07)',
-        }}
-      >
-        <Typography level="title-sm" sx={{ mb: 2, color: 'neutral.300' }}>
+      <Sheet variant="outlined" sx={{ borderRadius: '12px', p: 2, flexShrink: 0 }}>
+        <Typography level="title-sm" sx={{ mb: 2 }}>
           Add Transaction
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <FormControl size="sm">
-            <FormLabel sx={{ color: 'neutral.400', fontSize: '11px' }}>Type</FormLabel>
-            <Select
-              value={type}
-              onChange={(_, v) => v && setType(v)}
-              size="sm"
-              sx={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: 'white',
-              }}
-            >
+            <FormLabel sx={{ fontSize: '11px' }}>Type</FormLabel>
+            <Select value={type} onChange={(_, v) => v && setType(v)} size="sm">
               {TRANSACTION_TYPES.map((t) => (
                 <Option key={t} value={t}>{t}</Option>
               ))}
@@ -169,88 +180,36 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
 
           <Box sx={{ display: 'flex', gap: 1 }}>
             <FormControl size="sm" sx={{ flex: 1 }}>
-              <FormLabel sx={{ color: 'neutral.400', fontSize: '11px' }}>Amount</FormLabel>
-              <Input
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                type="number"
-                placeholder="0.00"
-                size="sm"
-                sx={{
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  color: 'white',
-                  '& input::placeholder': { color: 'neutral.600' },
-                }}
-              />
+              <FormLabel sx={{ fontSize: '11px' }}>Amount</FormLabel>
+              <Input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" placeholder="0.00" size="sm" />
             </FormControl>
             <FormControl size="sm" sx={{ flex: 1 }}>
-              <FormLabel sx={{ color: 'neutral.400', fontSize: '11px' }}>Value</FormLabel>
-              <Input
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                type="number"
-                placeholder="0.00"
-                size="sm"
-                sx={{
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  color: 'white',
-                  '& input::placeholder': { color: 'neutral.600' },
-                }}
-              />
+              <FormLabel sx={{ fontSize: '11px' }}>Value</FormLabel>
+              <Input value={value} onChange={(e) => setValue(e.target.value)} type="number" placeholder="0.00" size="sm" />
             </FormControl>
           </Box>
 
           <FormControl size="sm">
-            <FormLabel sx={{ color: 'neutral.400', fontSize: '11px' }}>Date & Time</FormLabel>
-            <Input
-              value={timestamp}
-              onChange={(e) => setTimestamp(e.target.value)}
-              type="datetime-local"
-              size="sm"
-              sx={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: 'white',
-                '& input[type="datetime-local"]::-webkit-calendar-picker-indicator': {
-                  filter: 'invert(0.7)',
-                },
-              }}
-            />
+            <FormLabel sx={{ fontSize: '11px' }}>Date & Time</FormLabel>
+            <Input value={timestamp} onChange={(e) => setTimestamp(e.target.value)} type="datetime-local" size="sm" />
           </FormControl>
 
           {error && (
-            <Typography level="body-xs" sx={{ color: 'danger.400' }}>{error}</Typography>
+            <Typography level="body-xs" color="danger">{error}</Typography>
           )}
 
-          <Button
-            onClick={handleCreate}
-            loading={submitting}
-            size="sm"
-            sx={{
-              background: 'rgba(99,102,241,0.2)',
-              color: '#818cf8',
-              border: '1px solid rgba(99,102,241,0.3)',
-              '&:hover': { background: 'rgba(99,102,241,0.35)' },
-            }}
-          >
+          <Button onClick={handleCreate} loading={submitting} size="sm" variant="soft" color="primary">
             Add Transaction
           </Button>
         </Box>
       </Sheet>
 
-      {/* Transaction list */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 0.5 }}>
+      {/* Transaction table */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 0.5, mb: 1, flexShrink: 0 }}>
           <Typography level="body-xs" sx={{ color: 'neutral.500' }}>
             {loadingList ? 'Loading…' : `${totalElements} transaction${totalElements !== 1 ? 's' : ''}`}
           </Typography>
-          {totalPages > 1 && (
-            <Typography level="body-xs" sx={{ color: 'neutral.500' }}>
-              Page {page + 1} of {totalPages}
-            </Typography>
-          )}
         </Box>
 
         {loadingList ? (
@@ -259,119 +218,227 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
           </Box>
         ) : transactions.length === 0 ? (
           <Box sx={{ py: 3, textAlign: 'center' }}>
-            <Typography level="body-sm" sx={{ color: 'neutral.600' }}>
+            <Typography level="body-sm" sx={{ color: 'neutral.500' }}>
               No transactions yet. Add one above to get started.
             </Typography>
           </Box>
         ) : (
           <>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {transactions.map((tx, i) => (
-                <Box key={tx.id}>
-              {i > 0 && <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)', my: 0.5 }} />}
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      px: 1.5,
-                      py: 1,
-                      borderRadius: '8px',
-                  '&:hover': { background: 'rgba(255,255,255,0.03)' },
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1 }}>
-                      <Chip
-                        size="sm"
-                        sx={{
-                          background: tx.type === 'Trade'
-                            ? 'rgba(59,130,246,0.1)'
-                            : 'rgba(139,92,246,0.1)',
-                          color: tx.type === 'Trade' ? '#2563eb' : '#7c3aed',
-                          border: 'none',
-                          fontSize: '10px',
-                          flexShrink: 0,
-                        }}
-                      >
-                        {tx.type}
-                      </Chip>
-                      <Box sx={{ minWidth: 0 }}>
-                        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-                          {tx.amount != null && (
-                            <Typography level="body-xs" sx={{ color: tx.amount >= 0 ? '#059669' : '#dc2626', fontWeight: 600 }}>
-                              {tx.amount >= 0 ? '+' : ''}{tx.amount} units
+            <Box sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+              <Table
+                size="sm"
+                hoverRow
+                sx={{
+                  tableLayout: 'auto',
+                  width: '100%',
+                  '--TableCell-paddingX': '10px',
+                  '--TableCell-paddingY': '6px',
+                  '& thead th': { color: 'neutral.500', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' },
+                  '& tbody tr': { cursor: 'pointer' },
+                  '& tbody tr:hover': { bgcolor: 'primary.50' },
+                }}
+              >
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th style={{ textAlign: 'right' }}>Amount</th>
+                    <th style={{ textAlign: 'right' }}>Value</th>
+                    <th style={{ textAlign: 'right' }}>Unit Price</th>
+                    <th style={{ textAlign: 'right' }}>Date & Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((tx) => {
+                    const unitPrice = tx.amount != null && tx.value != null && tx.amount !== 0
+                      ? tx.value / Math.abs(tx.amount)
+                      : null
+                    return (
+                    <tr key={tx.id} onClick={() => setSelectedTx(tx)}>
+                      <td>
+                        <Chip
+                          size="sm"
+                          variant="soft"
+                          color={tx.type === 'Trade' ? 'primary' : 'neutral'}
+                          sx={{ fontSize: '10px' }}
+                        >
+                          {tx.type}
+                        </Chip>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {tx.amount != null ? (
+                          <Box>
+                            <Typography level="body-xs" sx={{ color: tx.amount >= 0 ? '#059669' : '#dc2626', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                              {tx.amount >= 0 ? '+' : ''}{tx.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}
                             </Typography>
-                          )}
-                          {tx.value != null && (
-                            <Typography level="body-xs" sx={{ color: 'neutral.300' }}>
-                              ${tx.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            <Typography level="body-xs" sx={{ color: 'neutral.400', fontSize: '10px' }}>
+                              units
                             </Typography>
-                          )}
-                        </Box>
-                        <Typography level="body-xs" sx={{ color: 'neutral.600', fontSize: '10px' }}>
+                          </Box>
+                        ) : (
+                          <Typography level="body-xs" sx={{ color: 'neutral.400' }}>—</Typography>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {tx.value != null ? (
+                          <Typography level="body-xs" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                            ${tx.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </Typography>
+                        ) : (
+                          <Typography level="body-xs" sx={{ color: 'neutral.400' }}>—</Typography>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {unitPrice != null ? (
+                          <Typography level="body-xs" sx={{ color: 'neutral.600', fontVariantNumeric: 'tabular-nums' }}>
+                            ${unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                          </Typography>
+                        ) : (
+                          <Typography level="body-xs" sx={{ color: 'neutral.400' }}>—</Typography>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <Typography level="body-xs" sx={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                           {formatDateTime(tx.timestamp)}
                         </Typography>
-                      </Box>
-                    </Box>
-                    <IconButton
-                      size="sm"
-                      variant="plain"
-                      color="danger"
-                      onClick={() => handleDelete(tx.id)}
-                      disabled={deletingId === tx.id}
-                      sx={{ minWidth: 28, minHeight: 28, flexShrink: 0 }}
-                    >
-                      {deletingId === tx.id
-                        ? <CircularProgress size="sm" sx={{ '--CircularProgress-size': '14px' }} />
-                        : <span style={{ fontSize: 14 }}>✕</span>}
-                    </IconButton>
-                  </Box>
-                </Box>
-              ))}
+                      </td>
+                    </tr>
+                    )
+                  })}
+                </tbody>
+              </Table>
             </Box>
 
-            {/* Pagination controls */}
+            {/* Pagination */}
             {totalPages > 1 && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1, pt: 1 }}>
-                <Button
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 0.5, pt: 1.5, flexShrink: 0 }}>
+                <IconButton
                   size="sm"
                   variant="plain"
                   disabled={page === 0}
                   onClick={() => goToPage(page - 1)}
-                  sx={{ color: 'neutral.400', minWidth: 32, '&:hover': { background: 'rgba(0,0,0,0.04)' } }}
+                  sx={{ minWidth: 28, minHeight: 28 }}
                 >
-                  ‹
-                </Button>
-                {Array.from({ length: totalPages }, (_, i) => (
-                  <Button
-                    key={i}
-                    size="sm"
-                    variant={i === page ? 'soft' : 'plain'}
-                    onClick={() => goToPage(i)}
-                    sx={{
-                      minWidth: 32,
-                      color: i === page ? '#059669' : 'neutral.500',
-                      background: i === page ? 'rgba(16,185,129,0.1)' : 'transparent',
-                      '&:hover': { background: i === page ? 'rgba(16,185,129,0.15)' : 'rgba(0,0,0,0.04)' },
-                    }}
-                  >
-                    {i + 1}
-                  </Button>
-                ))}
-                <Button
+                  <span style={{ fontSize: 14 }}>‹</span>
+                </IconButton>
+                {paginationRange(page, totalPages).map((item, idx) =>
+                  item === 'ellipsis' ? (
+                    <Typography key={`e${idx}`} level="body-xs" sx={{ color: 'neutral.400', px: 0.5, userSelect: 'none' }}>…</Typography>
+                  ) : (
+                    <Button
+                      key={item}
+                      size="sm"
+                      variant={item === page ? 'soft' : 'plain'}
+                      color={item === page ? 'primary' : 'neutral'}
+                      onClick={() => goToPage(item)}
+                      sx={{ minWidth: 28, minHeight: 28, px: 0.5, fontSize: '12px' }}
+                    >
+                      {item + 1}
+                    </Button>
+                  )
+                )}
+                <IconButton
                   size="sm"
                   variant="plain"
                   disabled={page >= totalPages - 1}
                   onClick={() => goToPage(page + 1)}
-                  sx={{ color: 'neutral.400', minWidth: 32, '&:hover': { background: 'rgba(0,0,0,0.04)' } }}
+                  sx={{ minWidth: 28, minHeight: 28 }}
                 >
-                  ›
-                </Button>
+                  <span style={{ fontSize: 14 }}>›</span>
+                </IconButton>
               </Box>
             )}
           </>
         )}
       </Box>
+
+      {/* Transaction detail modal */}
+      <Modal open={!!selectedTx} onClose={() => setSelectedTx(null)}>
+        <ModalDialog variant="outlined" sx={{ borderRadius: '16px', maxWidth: 420, width: '100%' }}>
+          <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              Transaction Details
+              {selectedTx && (
+                <Chip
+                  size="sm"
+                  variant="soft"
+                  color={selectedTx.type === 'Trade' ? 'primary' : 'neutral'}
+                >
+                  {selectedTx.type}
+                </Chip>
+              )}
+            </Box>
+          </DialogTitle>
+          <Divider />
+          {selectedTx && (
+            <DialogContent>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+                <DetailRow label="ID" value={selectedTx.id} mono />
+                <DetailRow label="Type" value={selectedTx.type} />
+                <DetailRow
+                  label="Amount"
+                  value={selectedTx.amount != null
+                    ? `${selectedTx.amount >= 0 ? '+' : ''}${selectedTx.amount.toLocaleString(undefined, { maximumFractionDigits: 6 })} units`
+                    : 'Not set'}
+                  color={selectedTx.amount != null ? (selectedTx.amount >= 0 ? '#059669' : '#dc2626') : undefined}
+                />
+                <DetailRow
+                  label="Value"
+                  value={selectedTx.value != null
+                    ? `$${selectedTx.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`
+                    : 'Not set'}
+                />
+                {selectedTx.amount != null && selectedTx.value != null && selectedTx.amount !== 0 && (
+                  <DetailRow
+                    label="Unit Price"
+                    value={`$${(selectedTx.value / Math.abs(selectedTx.amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`}
+                  />
+                )}
+                <Divider />
+                <DetailRow label="Date & Time" value={formatFullDateTime(selectedTx.timestamp)} />
+                <DetailRow label="Asset ID" value={selectedTx.assetId} mono />
+              </Box>
+            </DialogContent>
+          )}
+          <Divider />
+          <DialogActions>
+            <Button variant="plain" color="neutral" onClick={() => setSelectedTx(null)}>
+              Close
+            </Button>
+            {selectedTx && (
+              <Button
+                color="danger"
+                variant="soft"
+                loading={deletingId === selectedTx.id}
+                onClick={() => selectedTx && handleDelete(selectedTx.id)}
+              >
+                Delete
+              </Button>
+            )}
+          </DialogActions>
+        </ModalDialog>
+      </Modal>
+    </Box>
+  )
+}
+
+function DetailRow({ label, value, mono, color }: { label: string; value: string; mono?: boolean; color?: string }) {
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 2 }}>
+      <Typography level="body-sm" sx={{ color: 'neutral.500', flexShrink: 0 }}>
+        {label}
+      </Typography>
+      <Typography
+        level="body-sm"
+        sx={{
+          fontWeight: 600,
+          textAlign: 'right',
+          wordBreak: 'break-all',
+          ...(mono ? { fontFamily: 'monospace', fontSize: '11px' } : {}),
+          ...(color ? { color } : {}),
+        }}
+      >
+        {value}
+      </Typography>
     </Box>
   )
 }

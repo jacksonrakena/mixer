@@ -699,12 +699,7 @@ export const AssetChart = ({
   return (
     <Card
       variant="outlined"
-      sx={{
-        background: "rgba(17,24,39,0.6)",
-        border: "1px solid rgba(255,255,255,0.07)",
-        borderRadius: "16px",
-        backdropFilter: "blur(12px)",
-      }}
+      sx={{ borderRadius: "16px" }}
     >
       <CardContent>
         {/* Header */}
@@ -719,7 +714,7 @@ export const AssetChart = ({
           <Box>
             <Typography
               level="title-lg"
-              sx={{ color: "white", fontWeight: 700 }}
+              sx={{ fontWeight: 700 }}
             >
               {assetName}
             </Typography>
@@ -727,14 +722,14 @@ export const AssetChart = ({
               sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}
             >
               {currentValue !== null && (
-                <Typography level="h3" sx={{ color: "white", fontWeight: 800 }}>
+                <Typography level="h3" sx={{ fontWeight: 800 }}>
                   {currentValue.toLocaleString(undefined, {
                     maximumFractionDigits: 2,
                   })}
                   <Typography
                     component="span"
                     level="body-sm"
-                    sx={{ color: "neutral.400", ml: 0.5 }}
+                    sx={{ color: "neutral.500", ml: 0.5 }}
                   >
                     {effectiveDisplayCurrency}
                   </Typography>
@@ -743,14 +738,9 @@ export const AssetChart = ({
               {change !== null && (
                 <Chip
                   size="sm"
-                  sx={{
-                    background: isPositive
-                      ? "rgba(52,211,153,0.15)"
-                      : "rgba(248,113,113,0.15)",
-                    color: isPositive ? "#34d399" : "#f87171",
-                    border: "none",
-                    fontWeight: 600,
-                  }}
+                  variant="soft"
+                  color={isPositive ? "success" : "danger"}
+                  sx={{ fontWeight: 600 }}
                 >
                   {isPositive ? "+" : ""}
                   {change.toFixed(2)}%
@@ -774,12 +764,12 @@ export const AssetChart = ({
                   fontWeight: 600,
                   transition: "all 0.15s",
                   background:
-                    range === r.value ? "rgba(99,102,241,0.25)" : "transparent",
+                    range === r.value ? "primary.100" : "transparent",
                   color:
-                    range === r.value ? "#818cf8" : "rgba(255,255,255,0.4)",
+                    range === r.value ? "primary.700" : "neutral.500",
                   "&:hover": {
-                    background: "rgba(99,102,241,0.15)",
-                    color: "#a5b4fc",
+                    background: "primary.50",
+                    color: "primary.700",
                   },
                 }}
               >
@@ -836,7 +826,7 @@ export const AssetChart = ({
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
-                  background: "rgba(10, 14, 26, 0.7)",
+                  background: "rgba(255, 255, 255, 0.85)",
                   backdropFilter: "blur(4px)",
                   borderRadius: "8px",
                   gap: 1.5,
@@ -845,12 +835,12 @@ export const AssetChart = ({
                 <CircularProgress
                   size="md"
                   sx={{
-                    "--CircularProgress-trackColor": "rgba(99,102,241,0.15)",
+                    "--CircularProgress-trackColor": "rgba(59,130,246,0.15)",
                   }}
                 />
                 <Typography
                   level="body-sm"
-                  sx={{ color: "neutral.300", fontWeight: 600 }}
+                  sx={{ color: "neutral.700", fontWeight: 600 }}
                 >
                   Recalculating…
                 </Typography>
@@ -903,7 +893,7 @@ export const AssetChart = ({
                 {
                   data: yValues,
                   label: assetName,
-                  color: "#818cf8",
+                  color: "#3b82f6",
                   showMark: false,
                   area: true,
                 },
@@ -928,13 +918,13 @@ export const AssetChart = ({
                 "& .MuiLineElement-root": { strokeWidth: 2 },
                 "& .MuiAreaElement-root": { fillOpacity: 0.12 },
                 "& .MuiChartsAxis-line, & .MuiChartsAxis-tick": {
-                  stroke: "rgba(255,255,255,0.1)",
+                  stroke: "rgba(0,0,0,0.12)",
                 },
                 "& .MuiChartsAxis-tickLabel": {
-                  fill: "rgba(255,255,255,0.4)",
+                  fill: "rgba(0,0,0,0.45)",
                   fontSize: "11px",
                 },
-                "& .MuiChartsAxis-label": { fill: "rgba(255,255,255,0.4)" },
+                "& .MuiChartsAxis-label": { fill: "rgba(0,0,0,0.45)" },
                 // Hide any built-in axis highlight lines
                 "& .MuiChartsAxisHighlight-root": { display: "none" },
               }}

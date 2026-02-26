@@ -43,17 +43,15 @@ export default function SignupPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #0a0e1a 0%, #0d1224 50%, #0a0e1a 100%)',
+        bgcolor: 'background.body',
       }}
     >
       <Sheet
+        variant="outlined"
         sx={{
           width: 380,
           p: 4,
           borderRadius: '16px',
-          background: 'rgba(17,24,39,0.8)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          backdropFilter: 'blur(12px)',
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
@@ -62,19 +60,19 @@ export default function SignupPage() {
               width: 36,
               height: 36,
               borderRadius: '10px',
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '16px',
               fontWeight: 800,
               color: 'white',
-              boxShadow: '0 0 16px rgba(99,102,241,0.4)',
+              boxShadow: '0 0 16px rgba(37,99,235,0.4)',
             }}
           >
             M
           </Box>
-          <Typography level="h4" sx={{ color: 'white', fontWeight: 700 }}>
+          <Typography level="h4" sx={{ fontWeight: 700 }}>
             Create an account
           </Typography>
         </Box>
@@ -86,17 +84,17 @@ export default function SignupPage() {
         )}
 
         <form onSubmit={handleSubmit}>
-          <Typography level="body-sm" sx={{ color: 'neutral.400', mb: 0.5 }}>
+          <Typography level="body-sm" sx={{ mb: 0.5 }}>
             Display Name
           </Typography>
           <Input
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             required
-            sx={{ mb: 2, background: 'rgba(255,255,255,0.05)', color: 'white' }}
+            sx={{ mb: 2 }}
           />
 
-          <Typography level="body-sm" sx={{ color: 'neutral.400', mb: 0.5 }}>
+          <Typography level="body-sm" sx={{ mb: 0.5 }}>
             Email
           </Typography>
           <Input
@@ -104,10 +102,10 @@ export default function SignupPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            sx={{ mb: 2, background: 'rgba(255,255,255,0.05)', color: 'white' }}
+            sx={{ mb: 2 }}
           />
 
-          <Typography level="body-sm" sx={{ color: 'neutral.400', mb: 0.5 }}>
+          <Typography level="body-sm" sx={{ mb: 0.5 }}>
             Password
           </Typography>
           <Input
@@ -116,7 +114,7 @@ export default function SignupPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
             placeholder="At least 8 characters"
-            sx={{ mb: 3, background: 'rgba(255,255,255,0.05)', color: 'white' }}
+            sx={{ mb: 3 }}
           />
 
           <Button
@@ -124,7 +122,7 @@ export default function SignupPage() {
             loading={loading}
             fullWidth
             sx={{
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
               fontWeight: 700,
               mb: 2,
             }}
@@ -133,9 +131,9 @@ export default function SignupPage() {
           </Button>
         </form>
 
-        <Typography level="body-sm" sx={{ color: 'neutral.500', textAlign: 'center' }}>
+        <Typography level="body-sm" sx={{ textAlign: 'center' }}>
           Already have an account?{' '}
-          <Link component={RouterLink} to="/login" sx={{ color: '#8b5cf6', fontWeight: 600 }}>
+          <Link component={RouterLink} to="/login" sx={{ color: 'primary.600', fontWeight: 600 }}>
             Sign in
           </Link>
         </Typography>
