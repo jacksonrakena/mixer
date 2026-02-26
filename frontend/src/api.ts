@@ -209,6 +209,51 @@ export async function fetchAllAggregations(
   return res.json();
 }
 
+// ── Portfolio aggregation ────────────────────────────────────────────────────
+
+export interface PortfolioAssetValue {
+  assetId: string;
+  assetName: string;
+  nativeCurrency: string;
+  value: number;
+}
+
+export interface PortfolioAggregationPoint {
+  date: string;
+  totalValue: number;
+  displayCurrency: string;
+  assetCount: number;
+  assetBreakdown: PortfolioAssetValue[];
+}
+
+export async function fetchPortfolioAggregation(
+  start: string,
+  end: string,
+  displayCurrency?: string,
+): Promise<PortfolioAggregationPoint[]> {
+  const params = displayCurrency
+    ? `?displayCurrency=${encodeURIComponent(displayCurrency)}`
+    : "";
+  const res = await fetch(
+    `${BASE}/agg/portfolio/${start}/${end}${params}`,
+  );
+  if (!res.ok)
+    throw new Error(`Failed to fetch portfolio: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchAllPortfolioAggregation(
+  displayCurrency?: string,
+): Promise<PortfolioAggregationPoint[]> {
+  const params = displayCurrency
+    ? `?displayCurrency=${encodeURIComponent(displayCurrency)}`
+    : "";
+  const res = await fetch(`${BASE}/agg/portfolio/all${params}`);
+  if (!res.ok)
+    throw new Error(`Failed to fetch portfolio: ${res.status}`);
+  return res.json();
+}
+
 // ── Supported currencies ─────────────────────────────────────────────────────
 
 export const SUPPORTED_CURRENCIES = [

@@ -12,6 +12,28 @@ import LoginPage from './pages/LoginPage.tsx'
 import SignupPage from './pages/SignupPage.tsx'
 import ProfilePage from './pages/ProfilePage.tsx'
 import AdminPage from './pages/AdminPage.tsx'
+import HomePage from './pages/HomePage.tsx'
+import AssetPage from './pages/AssetPage.tsx'
+import { useOutletContext } from 'react-router-dom'
+import type { SupportedCurrency } from './api'
+
+interface AppContext {
+  displayCurrency: SupportedCurrency
+}
+
+export function useAppContext() {
+  return useOutletContext<AppContext>()
+}
+
+function HomeWrapper() {
+  const { displayCurrency } = useAppContext()
+  return <HomePage displayCurrency={displayCurrency} />
+}
+
+function AssetWrapper() {
+  const { displayCurrency } = useAppContext()
+  return <AssetPage displayCurrency={displayCurrency} />
+}
 
 const theme = extendTheme({
   colorSchemes: {
@@ -86,9 +108,12 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/signup" element={<SignupPage />} />
             </Route>
             <Route element={<ProtectedRoute />}>
-              <Route path="/" element={<App />} />
-              <Route path="/profile" element={<App page="profile" />} />
-              <Route path="/admin" element={<App page="admin" />} />
+              <Route element={<App />}>
+                <Route path="/" element={<HomeWrapper />} />
+                <Route path="/asset/:assetId" element={<AssetWrapper />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/admin" element={<AdminPage />} />
+              </Route>
             </Route>
           </Routes>
         </AuthProvider>
