@@ -1,21 +1,39 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Box from '@mui/joy/Box'
 import Typography from '@mui/joy/Typography'
 import Sheet from '@mui/joy/Sheet'
 import Divider from '@mui/joy/Divider'
 import Select from '@mui/joy/Select'
 import Option from '@mui/joy/Option'
+import IconButton from '@mui/joy/IconButton'
+import Menu from '@mui/joy/Menu'
+import MenuItem from '@mui/joy/MenuItem'
+import MenuButton from '@mui/joy/MenuButton'
+import Dropdown from '@mui/joy/Dropdown'
+import ListItemDecorator from '@mui/joy/ListItemDecorator'
 import { fetchAssets, SUPPORTED_CURRENCIES, type AssetDto, type SupportedCurrency } from './api'
 import { AssetList } from './AssetList'
 import { AssetChart } from './AssetChart'
 import { TransactionPanel } from './TransactionPanel'
+import { useAuth } from './AuthContext'
+import ProfilePage from './pages/ProfilePage'
+import AdminPage from './pages/AdminPage'
 
-export default function App() {
+interface AppProps {
+  page?: 'profile' | 'admin'
+}
+
+export default function App({ page }: AppProps) {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const [assets, setAssets] = useState<AssetDto[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loadingAssets, setLoadingAssets] = useState(true)
   const [staleAfterMap, setStaleAfterMap] = useState<Record<string, number>>({})
-  const [displayCurrency, setDisplayCurrency] = useState<SupportedCurrency>('AUD')
+  const [displayCurrency, setDisplayCurrency] = useState<SupportedCurrency>(
+    (user?.displayCurrency as SupportedCurrency) ?? 'AUD',
+  )
 
   useEffect(() => {
     fetchAssets()
@@ -98,9 +116,74 @@ export default function App() {
         <Typography level="body-xs" sx={{ color: 'neutral.500' }}>
           Portfolio Tracker
         </Typography>
+
+        {/* User menu */}
+        <Box sx={{ ml: 'auto' }}>
+          <Dropdown>
+            <MenuButton
+              variant="plain"
+              sx={{
+                color: 'neutral.300',
+                fontWeight: 600,
+                fontSize: '13px',
+                '&:hover': { background: 'rgba(255,255,255,0.06)' },
+                borderRadius: '8px',
+                px: 1.5,
+              }}
+            >
+              {user?.displayName ?? user?.email ?? ''}
+            </MenuButton>
+            <Menu
+              placement="bottom-end"
+              sx={{
+                background: 'rgba(17,24,39,0.95)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(16px)',
+                borderRadius: '10px',
+                minWidth: 160,
+                '& .MuiMenuItem-root': {
+                  color: 'white',
+                  fontSize: '13px',
+                  '&:hover': { background: 'rgba(99,102,241,0.15)' },
+                },
+              }}
+            >
+              <MenuItem onClick={() => navigate('/')}>
+                <ListItemDecorator>📊</ListItemDecorator>
+                Dashboard
+              </MenuItem>
+              <MenuItem onClick={() => navigate('/profile')}>
+                <ListItemDecorator>👤</ListItemDecorator>
+                Profile
+              </MenuItem>
+              {user?.roles.includes('GLOBAL_ADMIN') && (
+                <MenuItem onClick={() => navigate('/admin')}>
+                  <ListItemDecorator>⚙️</ListItemDecorator>
+                  Admin
+                </MenuItem>
+              )}
+              <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
+              <MenuItem
+                onClick={async () => {
+                  await logout()
+                  navigate('/login', { replace: true })
+                }}
+                sx={{ color: 'danger.400 !important' }}
+              >
+                <ListItemDecorator>🚪</ListItemDecorator>
+                Sign out
+              </MenuItem>
+            </Menu>
+          </Dropdown>
+        </Box>
       </Sheet>
 
       {/* Main layout */}
+      {page === 'profile' ? (
+        <ProfilePage />
+      ) : page === 'admin' ? (
+        <AdminPage />
+      ) : (
       <Box
         sx={{
           flex: 1,
@@ -281,6 +364,7 @@ export default function App() {
           )}
         </Box>
       </Box>
+      )}
     </Box>
   )
 }

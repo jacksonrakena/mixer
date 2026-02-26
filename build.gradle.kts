@@ -39,6 +39,8 @@ dependencies {
     implementation("com.yahoofinance-api:YahooFinanceAPI:_")
     implementation("org.jetbrains.kotlin:kotlin-reflect:_")
     implementation("org.jetbrains.exposed:exposed-kotlin-datetime:_")
+    implementation(Spring.boot.security)
+    implementation("org.springframework.session:spring-session-jdbc:_")
     developmentOnly(Spring.boot.devTools)
     annotationProcessor(Spring.boot.configurationProcessor)
     implementation("org.jobrunr:jobrunr-kotlin-2.2-support:_")

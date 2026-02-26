@@ -3,6 +3,17 @@ const BASE = "/api";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+export interface UserResponse {
+  id: string;
+  email: string;
+  displayName: string;
+  emailVerified: boolean;
+  timezone: string;
+  displayCurrency: string;
+  roles: string[];
+  createdAt: number;
+}
+
 export interface AssetDto {
   id: string;
   name: string;
@@ -13,7 +24,6 @@ export interface AssetDto {
 
 export interface CreateAssetRequest {
   name: string;
-  ownerId: string;
   currency: string;
 }
 
@@ -243,4 +253,75 @@ export function daysAgo(n: number): string {
 /** Today as YYYY-MM-DD */
 export function today(): string {
   return toLocalDateString(new Date());
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+export async function login(
+  email: string,
+  password: string,
+): Promise<UserResponse> {
+  const res = await fetch(`${BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const msg =
+      res.status === 401
+        ? "Invalid email or password"
+        : `Login failed (${res.status})`;
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+export async function signup(
+  email: string,
+  password: string,
+  displayName: string,
+): Promise<UserResponse> {
+  const res = await fetch(`${BASE}/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, displayName }),
+  });
+  if (!res.ok) {
+    if (res.status === 409) throw new Error("Email already in use");
+    const body = await res.text();
+    throw new Error(body || `Signup failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function logout(): Promise<void> {
+  await fetch(`${BASE}/auth/logout`, { method: "POST" });
+}
+
+export async function fetchMe(): Promise<UserResponse> {
+  const res = await fetch(`${BASE}/auth/me`);
+  if (!res.ok) throw new Error("Not authenticated");
+  return res.json();
+}
+
+export async function updateProfile(req: {
+  displayName?: string;
+  timezone?: string;
+  displayCurrency?: string;
+}): Promise<UserResponse> {
+  const res = await fetch(`${BASE}/auth/profile`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) throw new Error(`Failed to update profile: ${res.status}`);
+  return res.json();
+}
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+export async function fetchAdminUsers(): Promise<UserResponse[]> {
+  const res = await fetch(`${BASE}/admin/users`);
+  if (!res.ok) throw new Error(`Failed to fetch users: ${res.status}`);
+  return res.json();
 }

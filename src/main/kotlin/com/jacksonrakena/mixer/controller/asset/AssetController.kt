@@ -1,9 +1,11 @@
 package com.jacksonrakena.mixer.controller.asset
 
+import com.jacksonrakena.mixer.controller.auth.AuthController
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import com.jacksonrakena.mixer.data.tables.concrete.Transaction
 import com.jacksonrakena.mixer.data.tables.virtual.AssetAggregate
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
@@ -28,8 +30,9 @@ class AssetController(
 
     @GetMapping
     fun getAllAssets(): List<AssetDto> {
+        val userId = AuthController.currentUserId()
         return transaction {
-            Asset.selectAll().map {
+            Asset.selectAll().where { Asset.ownerId eq userId }.map {
                 AssetDto(
                     id = it[Asset.id],
                     name = it[Asset.name],
@@ -45,36 +48,41 @@ class AssetController(
 
     @PostMapping
     fun createAsset(@RequestBody request: CreateAssetRequest): CreateAssetResponse {
+        val userId = AuthController.currentUserId()
         val assetId = transaction {
             Asset.insert {
                 it[name] = request.name
-                it[ownerId] = request.ownerId
+                it[ownerId] = userId
                 it[currency] = request.currency
                 it[provider] = request.provider
                 it[providerData] = request.providerData
             }[Asset.id]
         }
 
-        logger.info { "Created asset $assetId for user ${request.ownerId}" }
+        logger.info { "Created asset $assetId for user $userId" }
 
         return CreateAssetResponse(assetId = assetId)
     }
 
     @DeleteMapping("/{id}")
     fun deleteAsset(@PathVariable id: UUID): DeleteAssetResponse {
+        val userId = AuthController.currentUserId()
         val assetId = id.toKotlinUuid()
 
-        // Delete associated transactions first
+        // Verify ownership
+        val owns = transaction {
+            Asset.selectAll().where { (Asset.id eq assetId) and (Asset.ownerId eq userId) }.firstOrNull() != null
+        }
+        if (!owns) {
+            return DeleteAssetResponse(assetId = assetId, deleted = false)
+        }
+
         transaction {
             Transaction.deleteWhere { Transaction.assetId eq assetId }
         }
-
-        // Delete associated aggregates
         transaction {
             AssetAggregate.deleteWhere { AssetAggregate.assetId eq assetId }
         }
-
-        // Delete the asset
         val deleted = transaction {
             Asset.deleteWhere { Asset.id eq assetId } > 0
         }

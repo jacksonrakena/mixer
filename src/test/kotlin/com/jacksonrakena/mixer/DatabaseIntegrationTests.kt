@@ -7,6 +7,7 @@ import com.jacksonrakena.mixer.data.market.MarketDataProvider
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import com.jacksonrakena.mixer.data.tables.concrete.Transaction
 import com.jacksonrakena.mixer.data.tables.concrete.User
+import com.jacksonrakena.mixer.data.tables.concrete.UserRole
 import com.jacksonrakena.mixer.data.tables.markets.ExchangeRate
 import com.jacksonrakena.mixer.data.tables.virtual.AssetAggregate
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -57,9 +58,12 @@ class DatabaseIntegrationTests {
     fun setup() {
         db = Database.connect("jdbc:h2:mem:dbtest_${System.nanoTime()};DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
         transaction(db) {
-            SchemaUtils.create(User, Asset, Transaction, ExchangeRate, AssetAggregate)
+            SchemaUtils.create(User, UserRole, Asset, Transaction, ExchangeRate, AssetAggregate)
             User.insert {
                 it[User.id] = userId
+                it[User.email] = "test@test.com"
+                it[User.passwordHash] = "hashed"
+                it[User.displayName] = "Test User"
                 it[User.timezone] = "UTC"
             }
             Asset.insert {
@@ -80,7 +84,7 @@ class DatabaseIntegrationTests {
     @AfterEach
     fun teardown() {
         transaction(db) {
-            SchemaUtils.drop(AssetAggregate, Transaction, ExchangeRate, Asset, User)
+            SchemaUtils.drop(AssetAggregate, Transaction, ExchangeRate, Asset, UserRole, User)
         }
     }
 

@@ -5,6 +5,7 @@ import com.jacksonrakena.mixer.data.AssetTransactionType
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import com.jacksonrakena.mixer.data.tables.concrete.Transaction
 import com.jacksonrakena.mixer.data.tables.concrete.User
+import com.jacksonrakena.mixer.data.tables.concrete.UserRole
 import com.jacksonrakena.mixer.upstream.CurrencyService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
@@ -15,6 +16,7 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jobrunr.jobs.lambdas.JobRequest
 import org.jobrunr.jobs.lambdas.JobRequestHandler
 import org.jobrunr.scheduling.JobRequestScheduler
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
@@ -32,7 +34,8 @@ class InsertSeedDataRequest: JobRequest {
     class InsertSeedDataRequestHandler(
         val database: Database,
         val currencyService: CurrencyService,
-        val jobRequestScheduler: JobRequestScheduler
+        val jobRequestScheduler: JobRequestScheduler,
+        val passwordEncoder: PasswordEncoder,
     ) : JobRequestHandler<InsertSeedDataRequest> {
         override fun run(request: InsertSeedDataRequest?) {
             if (request == null) {
@@ -42,16 +45,25 @@ class InsertSeedDataRequest: JobRequest {
 
             val time = Instant.parse("2026-02-16T23:05:37.337365Z")
             val assetId = Uuid.parse("6c942179-c993-4b25-86dd-6346fb0e3005")
+            val userId = Uuid.parse("6c942179-c993-4b25-86dd-6346fb0e3005")
             transaction {
                 User.insert {
-                    it[User.id] = Uuid.parse("6c942179-c993-4b25-86dd-6346fb0e3005")
+                    it[User.id] = userId
+                    it[User.email] = "admin@mixer.local"
+                    it[User.passwordHash] = passwordEncoder.encode("admin123")!!
+                    it[User.displayName] = "Administrator"
+                    it[User.emailVerified] = true
                     it[User.timezone] = "Australia/Sydney"
+                }
+                UserRole.insert {
+                    it[UserRole.userId] = userId
+                    it[UserRole.role] = "GLOBAL_ADMIN"
                 }
                 Asset.insert {
                     it[Asset.id] = assetId
                     it[Asset.name] = "Atlassian (TEAM)"
                     it[Asset.currency] = "USD"
-                    it[Asset.ownerId] = Uuid.parse("6c942179-c993-4b25-86dd-6346fb0e3005")
+                    it[Asset.ownerId] = userId
                     it[Asset.provider] = "USER"
                 }
                 Transaction.batchInsert(
@@ -648,7 +660,7 @@ class InsertSeedDataRequest: JobRequest {
                 }
             }
             logger.info { "Finished seed data" }
-            jobRequestScheduler.enqueue(RecomputeUserAggregationRequest(Uuid.parse("6c942179-c993-4b25-86dd-6346fb0e3005")))
+            jobRequestScheduler.enqueue(RecomputeUserAggregationRequest(userId))
         }
 
         companion object {

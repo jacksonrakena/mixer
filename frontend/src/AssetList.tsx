@@ -16,9 +16,6 @@ import DialogContent from '@mui/joy/DialogContent'
 import DialogActions from '@mui/joy/DialogActions'
 import { createAsset, deleteAsset, type AssetDto } from './api'
 
-// Hard-coded owner ID — in a real app this would come from auth
-const OWNER_ID = '00000000-0000-0000-0000-000000000001'
-
 const POPULAR_CURRENCIES = ['USD', 'NZD', 'AUD', 'EUR', 'GBP', 'BTC', 'ETH']
 
 interface AssetListProps {
@@ -51,8 +48,8 @@ export const AssetList = ({
     setCreating(true)
     setCreateError(null)
     try {
-      const res = await createAsset({ name: name.trim(), ownerId: OWNER_ID, currency })
-      const newAsset: AssetDto = { id: res.assetId, name: name.trim(), ownerId: OWNER_ID, currency }
+      const res = await createAsset({ name: name.trim(), currency })
+      const newAsset: AssetDto = { id: res.assetId, name: name.trim(), ownerId: '', currency, staleAfter: 0 }
       onAssetsChange([...assets, newAsset])
       setName('')
       onSelect(res.assetId)
