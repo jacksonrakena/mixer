@@ -1,6 +1,7 @@
 package com.jacksonrakena.mixer.data
 
 import com.jacksonrakena.mixer.data.tables.virtual.AssetAggregate
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.serialization.Serializable
@@ -21,7 +22,7 @@ data class AssetTransactionAggregation(
     val amountDeltaReconciliation: Double = 0.0,
     val amountDeltaOther: Double = 0.0,
 
-    /** Value in the asset's native currency. */
+    /** Value in the asset's native currency (= amount for USER assets, amount × price for market assets). */
     val nativeValue: Double = 0.0,
 
     /** Value converted to the user's display currency, or null if no FX rate was available. */
@@ -35,17 +36,25 @@ data class AssetTransactionAggregation(
 
     /** FX conversion details, or null if no conversion was needed or no rate was available. */
     val fxConversion: FxConversionInfo? = null,
+
+    /** Per-unit market price (for market-data assets); null for manual/USER assets. */
+    val unitPrice: Double? = null,
+
+    /** The date from which the unit price was sourced (may differ from the aggregation date due to carry-forward). */
+    val valueDate: LocalDate? = null,
 ) {
     companion object {
         fun fromResultRow(row: ResultRow): AssetTransactionAggregation {
             return AssetTransactionAggregation(
                 assetId = row[AssetAggregate.assetId],
                 date = row[AssetAggregate.periodEndDate].atStartOfDayIn(TimeZone.Companion.currentSystemDefault()).toJavaInstant().toKotlinInstant(),
-                amount = row[AssetAggregate.totalValue],
+                amount = row[AssetAggregate.holding],
                 amountDeltaTrades = row[AssetAggregate.deltaTrades],
                 amountDeltaReconciliation = row[AssetAggregate.deltaReconciliation],
                 amountDeltaOther = row[AssetAggregate.deltaOther],
                 nativeValue = row[AssetAggregate.totalValue],
+                unitPrice = row[AssetAggregate.unitPrice],
+                valueDate = row[AssetAggregate.valueDate],
             )
         }
     }

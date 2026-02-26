@@ -35,7 +35,9 @@ class AssetController(
                     name = it[Asset.name],
                     ownerId = it[Asset.ownerId],
                     currency = it[Asset.currency],
-                    staleAfter = it[Asset.staleAfter]
+                    staleAfter = it[Asset.staleAfter],
+                    provider = it[Asset.provider],
+                    providerData = it[Asset.providerData],
                 )
             }
         }
@@ -48,6 +50,8 @@ class AssetController(
                 it[name] = request.name
                 it[ownerId] = request.ownerId
                 it[currency] = request.currency
+                it[provider] = request.provider
+                it[providerData] = request.providerData
             }[Asset.id]
         }
 

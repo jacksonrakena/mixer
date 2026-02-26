@@ -9,5 +9,7 @@ data class AssetDto(
     val name: String,
     val ownerId: Uuid,
     val currency: String,
-    val staleAfter: Long = 0
+    val staleAfter: Long = 0,
+    val provider: String = "USER",
+    val providerData: String? = null,
 )

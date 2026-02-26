@@ -5,6 +5,8 @@ import com.jacksonrakena.mixer.data.AssetTransaction
 import com.jacksonrakena.mixer.data.AssetTransactionAggregation
 import com.jacksonrakena.mixer.data.AssetTransactionSource
 import com.jacksonrakena.mixer.data.AssetTransactionType
+import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.doubles.shouldBeExactly
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
@@ -59,28 +61,28 @@ class AggregationServiceTests {
                         timestamp = now - 5.days,
                         type = AssetTransactionType.Trade,
                         amount = 10.0,
-                        value = 100.0,
+                        value = 100.0, // $10/unit
                     ),
                     AssetTransaction(
                         assetId = testAsset,
                         timestamp = now - 4.days,
                         type = AssetTransactionType.Trade,
                         amount = -1.0,
-                        value = 100.0,
+                        value = 10.0, // $10/unit
                     ),
                     AssetTransaction(
                         assetId = testAsset,
                         timestamp = now - 3.days,
                         type = AssetTransactionType.Reconciliation,
                         amount = 11.0,
-                        value = 101.0,
+                        value = 121.0, // $11/unit
                     ),
                     AssetTransaction(
                         assetId = testAsset,
                         timestamp = now,
                         type = AssetTransactionType.Trade,
                         amount = 2.0,
-                        value = 101.0
+                        value = 24.0 // $12/unit
                     ),
                 )
             )
@@ -89,17 +91,40 @@ class AggregationServiceTests {
                 TimeZone.currentSystemDefault(),
                 mats,
                 end
-            )
+            ).toList()
 
-            result shouldBe listOf(
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-12T12:59:00Z"), amount=10.0, nativeValue=10.0, amountDeltaTrades=10.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-13T12:59:00Z"), amount=9.0, nativeValue=9.0, amountDeltaTrades=-1.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-14T12:59:00Z"), amount=11.0, nativeValue=11.0, amountDeltaReconciliation=11.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-15T12:59:00Z"), amount=11.0, nativeValue=11.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-16T12:59:00Z"), amount=11.0, nativeValue=11.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-17T12:59:00Z"), amount=13.0, nativeValue=13.0, amountDeltaTrades=2.0),
-                AssetTransactionAggregation(testAsset, date=Instant.parse("2026-02-18T12:59:00Z"), amount=13.0, nativeValue=13.0),
-            )
+            // Day 1: 10 units @ $10/unit = $100
+            result[0].amount shouldBeExactly 10.0
+            result[0].unitPrice shouldBe 10.0
+            result[0].nativeValue shouldBeExactly 100.0
+            result[0].amountDeltaTrades shouldBeExactly 10.0
+
+            // Day 2: 9 units @ $10/unit (carry-forward from sell at $10) = $90
+            result[1].amount shouldBeExactly 9.0
+            result[1].unitPrice shouldBe 10.0
+            result[1].nativeValue shouldBeExactly 90.0
+
+            // Day 3: reconciliation 11 units @ $11/unit = $121
+            result[2].amount shouldBeExactly 11.0
+            result[2].unitPrice shouldBe 11.0
+            result[2].nativeValue shouldBeExactly 121.0
+
+            // Day 4-5: carry-forward, 11 units @ $11/unit = $121
+            result[3].amount shouldBeExactly 11.0
+            result[3].unitPrice shouldBe 11.0
+            result[3].nativeValue shouldBeExactly 121.0
+            result[4].nativeValue shouldBeExactly 121.0
+
+            // Day 6: trade +2, 13 units @ $12/unit = $156
+            result[5].amount shouldBeExactly 13.0
+            result[5].unitPrice shouldBe 12.0
+            result[5].nativeValue shouldBeExactly 156.0
+
+            // Day 7: carry-forward, 13 @ $12 = $156
+            result[6].nativeValue shouldBeExactly 156.0
+            result[6].amount shouldBeExactly 13.0
+
+            result shouldHaveSize 7
         }
 
         @Test
@@ -115,28 +140,28 @@ class AggregationServiceTests {
                         timestamp = now - 5.days,
                         type = AssetTransactionType.Reconciliation,
                         amount = 10.0,
-                        value = 100.0,
+                        value = 100.0, // $10/unit
                     ),
                     AssetTransaction(
                         assetId = testAsset,
                         timestamp = now - 4.days,
                         type = AssetTransactionType.Reconciliation,
                         amount = 0.0,
-                        value = 100.0,
+                        value = 0.0,
                     ),
                     AssetTransaction(
                         assetId = testAsset,
                         timestamp = now - 3.days,
                         type = AssetTransactionType.Reconciliation,
                         amount = 11.0,
-                        value = 101.0,
+                        value = 110.0, // $10/unit
                     ),
                     AssetTransaction(
                         assetId = testAsset,
                         timestamp = now,
                         type = AssetTransactionType.Reconciliation,
                         amount = 2.0,
-                        value = 101.0
+                        value = 22.0, // $11/unit
                     ),
                 )
             )
@@ -145,56 +170,32 @@ class AggregationServiceTests {
                 TimeZone.currentSystemDefault(),
                 mats,
                 end
-            )
+            ).toList()
 
-            result shouldBe listOf(
-                AssetTransactionAggregation(
-                    assetId = testAsset,
-                    date = Instant.parse("2026-02-12T12:59:00Z"),
-                    amount = 10.0,
-                    nativeValue = 10.0,
-                    amountDeltaReconciliation = 10.0,
-                ),
-                AssetTransactionAggregation(
-                    assetId = testAsset,
-                    date = Instant.parse("2026-02-13T12:59:00Z"),
-                    amount = 0.0,
-                    nativeValue = 0.0,
-                    amountDeltaReconciliation = 0.0,
-                ),
-                AssetTransactionAggregation(
-                    assetId = testAsset,
-                    date = Instant.parse("2026-02-14T12:59:00Z"),
-                    amount = 11.0,
-                    nativeValue = 11.0,
-                    amountDeltaReconciliation = 11.0,
-                ),
-                AssetTransactionAggregation(
-                    assetId = testAsset,
-                    date = Instant.parse("2026-02-15T12:59:00Z"),
-                    amount = 11.0,
-                    nativeValue = 11.0,
-                ),
-                AssetTransactionAggregation(
-                    assetId = testAsset,
-                    date = Instant.parse("2026-02-16T12:59:00Z"),
-                    amount = 11.0,
-                    nativeValue = 11.0,
-                ),
-                AssetTransactionAggregation(
-                    assetId = testAsset,
-                    date = Instant.parse("2026-02-17T12:59:00Z"),
-                    amount = 2.0,
-                    nativeValue = 2.0,
-                    amountDeltaReconciliation = 2.0,
-                ),
-                AssetTransactionAggregation(
-                    assetId = testAsset,
-                    date = Instant.parse("2026-02-18T12:59:00Z"),
-                    amount = 2.0,
-                    nativeValue = 2.0,
-                )
-            )
+            // Day 1: 10 units @ $10/unit
+            result[0].amount shouldBeExactly 10.0
+            result[0].nativeValue shouldBeExactly 100.0
+
+            // Day 2: reconciliation to 0 units, amount=0 so unitPrice unchanged (carry-forward $10)
+            result[1].amount shouldBeExactly 0.0
+            result[1].nativeValue shouldBeExactly 0.0
+
+            // Day 3: reconciliation to 11 @ $10/unit = $110
+            result[2].amount shouldBeExactly 11.0
+            result[2].nativeValue shouldBeExactly 110.0
+
+            // Day 4-5: carry-forward 11 @ $10/unit
+            result[3].nativeValue shouldBeExactly 110.0
+            result[4].nativeValue shouldBeExactly 110.0
+
+            // Day 6: reconciliation to 2 @ $11/unit = $22
+            result[5].amount shouldBeExactly 2.0
+            result[5].nativeValue shouldBeExactly 22.0
+
+            // Day 7: carry-forward
+            result[6].nativeValue shouldBeExactly 22.0
+
+            result shouldHaveSize 7
         }
 
         @Test
@@ -210,35 +211,35 @@ class AggregationServiceTests {
                         timestamp = now - 5.days,
                         type = AssetTransactionType.Trade,
                         amount = 10.0,
-                        value = 100.0,
+                        value = 100.0, // $10/unit
                     ),
                     AssetTransaction(
                         assetId = testAsset,
                         timestamp = now - 4.days,
                         type = AssetTransactionType.Trade,
                         amount = -1.0,
-                        value = 100.0,
+                        value = 10.0, // $10/unit
                     ),
                     AssetTransaction(
                         assetId = testAsset,
                         timestamp = now - 2.days,
                         type = AssetTransactionType.Trade,
                         amount = 2.0,
-                        value = 101.0,
+                        value = 20.0, // $10/unit
                     ),
                     AssetTransaction(
                         assetId = testAsset,
                         timestamp = now - 2.days + 2.minutes,
                         type = AssetTransactionType.Reconciliation,
                         amount = 11.0,
-                        value = 101.0,
+                        value = 110.0, // $10/unit
                     ),
                     AssetTransaction(
                         assetId = testAsset,
                         timestamp = now - 2.days + 4.minutes,
                         type = AssetTransactionType.Trade,
                         amount = 2.0,
-                        value = 101.0
+                        value = 22.0, // $11/unit
                     ),
                 )
             )
@@ -247,56 +248,31 @@ class AggregationServiceTests {
                 TimeZone.currentSystemDefault(),
                 mats,
                 end
-            )
+            ).toList()
 
-            result shouldBe listOf(
-                AssetTransactionAggregation(
-                    assetId = testAsset,
-                    date = Instant.parse("2026-02-12T12:59:00Z"),
-                    amount = 10.0,
-                    nativeValue = 10.0,
-                    amountDeltaTrades = 10.0,
-                ),
-                AssetTransactionAggregation(
-                    assetId = testAsset,
-                    date = Instant.parse("2026-02-13T12:59:00Z"),
-                    amount = 9.0,
-                    nativeValue = 9.0,
-                    amountDeltaTrades = -1.0,
-                ),
-                AssetTransactionAggregation(
-                    assetId = testAsset,
-                    date = Instant.parse("2026-02-14T12:59:00Z"),
-                    amount = 9.0,
-                    nativeValue = 9.0,
-                ),
-                AssetTransactionAggregation(
-                    assetId = testAsset,
-                    date = Instant.parse("2026-02-15T12:59:00Z"),
-                    amount = 13.0,
-                    nativeValue = 13.0,
-                    amountDeltaReconciliation = 11.0,
-                    amountDeltaTrades = 2.0,
-                ),
-                AssetTransactionAggregation(
-                    assetId = testAsset,
-                    date = Instant.parse("2026-02-16T12:59:00Z"),
-                    amount = 13.0,
-                    nativeValue = 13.0,
-                ),
-                AssetTransactionAggregation(
-                    assetId = testAsset,
-                    date = Instant.parse("2026-02-17T12:59:00Z"),
-                    amount = 13.0,
-                    nativeValue = 13.0,
-                ),
-                AssetTransactionAggregation(
-                    assetId = testAsset,
-                    date = Instant.parse("2026-02-18T12:59:00Z"),
-                    amount = 13.0,
-                    nativeValue = 13.0,
-                )
-            )
+            // Day 1: 10 @ $10 = $100
+            result[0].amount shouldBeExactly 10.0
+            result[0].nativeValue shouldBeExactly 100.0
+
+            // Day 2: 9 @ $10 = $90
+            result[1].amount shouldBeExactly 9.0
+            result[1].nativeValue shouldBeExactly 90.0
+
+            // Day 3: carry-forward 9 @ $10 = $90
+            result[2].amount shouldBeExactly 9.0
+            result[2].nativeValue shouldBeExactly 90.0
+
+            // Day 4: trade+2, reconciliation=11, trade+2 = 13 units, last tx @ $11/unit = $143
+            result[3].amount shouldBeExactly 13.0
+            result[3].unitPrice shouldBe 11.0
+            result[3].nativeValue shouldBeExactly 143.0
+
+            // Days 5-7: carry-forward 13 @ $11 = $143
+            result[4].nativeValue shouldBeExactly 143.0
+            result[5].nativeValue shouldBeExactly 143.0
+            result[6].nativeValue shouldBeExactly 143.0
+
+            result shouldHaveSize 7
         }
     }
 }

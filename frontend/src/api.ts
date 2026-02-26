@@ -74,6 +74,10 @@ export interface AssetAggregation {
   displayCurrency: string | null;
   /** FX conversion details, or null if no conversion was needed or no rate was available */
   fxConversion: FxConversionInfo | null;
+  /** Per-unit price used for valuation */
+  unitPrice: number | null;
+  /** The date from which the unit price was sourced (may differ from aggregation date due to carry-forward) */
+  valueDate: string | null; // ISO local date (YYYY-MM-DD)
 }
 
 // ── Assets ───────────────────────────────────────────────────────────────────

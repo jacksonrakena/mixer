@@ -175,7 +175,7 @@ function ChartTooltip({
         sx={{
           display: "flex",
           justifyContent: "space-between",
-          mb: showDeltas || showRecon || hasFx ? 1 : 0,
+          mb: showDeltas || showRecon || hasFx || point.unitPrice != null ? 1 : 0,
         }}
       >
         <Typography level="body-sm" sx={{ color: "rgba(0,0,0,0.55)" }}>
@@ -192,6 +192,62 @@ function ChartTooltip({
           {point.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}
         </Typography>
       </Box>
+
+      {/* Unit price / value date info */}
+      {point.unitPrice != null && (
+        <Box
+          sx={{
+            borderTop: "1px solid rgba(0,0,0,0.08)",
+            pt: 0.75,
+            mb: showDeltas || showRecon || hasFx ? 0.5 : 0,
+          }}
+        >
+          <Typography
+            level="body-xs"
+            sx={{ color: "rgba(0,0,0,0.35)", fontWeight: 600, mb: 0.25 }}
+          >
+            Valuation
+          </Typography>
+          <Box
+            sx={{ display: "flex", justifyContent: "space-between", py: 0.15 }}
+          >
+            <Typography level="body-xs" sx={{ color: "rgba(0,0,0,0.5)" }}>
+              Unit price
+            </Typography>
+            <Typography
+              level="body-xs"
+              sx={{
+                color: "#1e293b",
+                fontWeight: 600,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {point.unitPrice.toLocaleString(undefined, {
+                maximumFractionDigits: 4,
+              })}{" "}
+              {point.nativeCurrency ?? effectiveCurrency}
+            </Typography>
+          </Box>
+          {point.valueDate && (
+            <Box
+              sx={{ display: "flex", justifyContent: "space-between", py: 0.15 }}
+            >
+              <Typography level="body-xs" sx={{ color: "rgba(0,0,0,0.5)" }}>
+                Value date
+              </Typography>
+              <Typography
+                level="body-xs"
+                sx={{
+                  color: "rgba(0,0,0,0.5)",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {point.valueDate}
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      )}
 
       {/* FX conversion info */}
       {hasFx && point.fxConversion && (
@@ -383,6 +439,8 @@ function fillDateRange(
   let lastNativeCurrency = data.length > 0 ? data[0].nativeCurrency : null;
   let lastDisplayCurrency = data.length > 0 ? data[0].displayCurrency : null;
   let lastFxConversion = data.length > 0 ? data[0].fxConversion : null;
+  let lastUnitPrice = data.length > 0 ? data[0].unitPrice : null;
+  let lastValueDate = data.length > 0 ? data[0].valueDate : null;
 
   while (cursor <= end) {
     const key = cursor.toISOString().slice(0, 10);
@@ -393,6 +451,8 @@ function fillDateRange(
       lastNativeCurrency = existing.nativeCurrency;
       lastDisplayCurrency = existing.displayCurrency;
       lastFxConversion = existing.fxConversion;
+      lastUnitPrice = existing.unitPrice;
+      lastValueDate = existing.valueDate;
       result.push(existing);
     } else {
       result.push({
@@ -407,6 +467,8 @@ function fillDateRange(
         nativeCurrency: lastNativeCurrency,
         displayCurrency: lastDisplayCurrency,
         fxConversion: lastFxConversion,
+        unitPrice: lastUnitPrice,
+        valueDate: lastValueDate,
       });
     }
     cursor.setUTCDate(cursor.getUTCDate() + 1);

@@ -17,11 +17,18 @@ class AggregationService {
         val logger = KotlinLogging.logger {}
     }
 
+    /**
+     * @param marketPrices optional map of date → per-unit close price for market-data assets.
+     *                     When non-null, nativeValue = holding × price (with carry-forward for missing dates).
+     *                     When null (USER mode), unit price is derived from transaction value/amount
+     *                     and carried forward for days without transactions.
+     */
     suspend fun forwardAggregate(
         asset: Uuid,
         timezone: TimeZone,
         ats: AssetTransactionSource,
         end: LocalDate,
+        marketPrices: Map<LocalDate, Double>? = null,
     ): Collection<AssetTransactionAggregation> {
         val start = ats.getEarliestTransaction(asset)?.timestamp ?: return emptyList()
         val transactions = ats.getTransactions(asset, start)
@@ -32,6 +39,10 @@ class AggregationService {
 
         val dateSpan = startDate..end
         logger.info { "Opening aggregation window from $startDate to $end, total ${dateSpan.count()} days" }
+
+        var lastKnownPrice: Double? = null
+        var lastKnownPriceDate: LocalDate? = null
+
         for (day in dateSpan) {
             val transactionsForDay = transactions.filter { it.timestamp.toLocalDateTime(timezone).date == day }.sortedBy { it.timestamp }
 
@@ -50,15 +61,43 @@ class AggregationService {
                     }
                 }
 
+                // Derive per-unit price from the transaction's value/amount
+                val txAmount = transaction.amount
+                val txValue = transaction.value
+                if (txAmount != null && txAmount != 0.0 && txValue != null) {
+                    lastKnownPrice = txValue / kotlin.math.abs(txAmount)
+                    lastKnownPriceDate = day
+                }
             }
+
+            // Resolve per-unit price: market data source takes priority, then transaction-derived
+            val unitPrice: Double?
+            val valueDate: LocalDate?
+            if (marketPrices != null) {
+                val marketPrice = marketPrices[day] ?: lastKnownPrice
+                if (marketPrice != null && marketPrices.containsKey(day)) {
+                    lastKnownPrice = marketPrice
+                    lastKnownPriceDate = day
+                }
+                unitPrice = marketPrice
+                valueDate = if (marketPrices.containsKey(day)) day else lastKnownPriceDate
+            } else {
+                unitPrice = lastKnownPrice
+                valueDate = lastKnownPriceDate
+            }
+
+            val nativeValue = if (unitPrice != null) currentHolding * unitPrice else currentHolding
+
             dailyAggregations.add(
                 AssetTransactionAggregation(
                     assetId = asset,
                     date = day.atTime(23, 59, 0).toInstant(timezone),
                     amount = currentHolding,
-                    nativeValue = currentHolding,
+                    nativeValue = nativeValue,
                     amountDeltaReconciliation = amountDeltaReconciliation,
                     amountDeltaTrades = amountDeltaTrades,
+                    unitPrice = unitPrice,
+                    valueDate = valueDate,
                 )
             )
         }

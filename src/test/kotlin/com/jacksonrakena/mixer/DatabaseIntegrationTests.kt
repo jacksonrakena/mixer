@@ -3,6 +3,7 @@ package com.jacksonrakena.mixer
 import com.jacksonrakena.mixer.data.AggregationService
 import com.jacksonrakena.mixer.data.AssetTransactionType
 import com.jacksonrakena.mixer.data.UserAggregationManager
+import com.jacksonrakena.mixer.data.market.MarketDataProvider
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import com.jacksonrakena.mixer.data.tables.concrete.Transaction
 import com.jacksonrakena.mixer.data.tables.concrete.User
@@ -15,6 +16,7 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.Database
@@ -43,6 +45,13 @@ class DatabaseIntegrationTests {
     private val otherAssetId = Uuid.random()
 
     private val baseTime = Instant.parse("2026-01-10T12:00:00Z")
+
+    /** No-op provider for USER asset tests. */
+    private val noOpMarketDataProvider = object : MarketDataProvider {
+        override fun getHistoricalPrices(ticker: String, startDate: LocalDate, endDate: LocalDate) = emptyMap<LocalDate, Double>()
+    }
+
+    private fun createManager() = UserAggregationManager(db, AggregationService(), noOpMarketDataProvider)
 
     @BeforeEach
     fun setup() {
@@ -212,7 +221,7 @@ class DatabaseIntegrationTests {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
             insertTx(assetId, baseTime + 1.days, AssetTransactionType.Trade, 5.0, 50.0)
 
-            val manager = UserAggregationManager(db, AggregationService())
+            val manager = createManager()
             manager.regenerateAggregatesForAsset(assetId)
 
             val aggregates = transaction(db) {
@@ -229,7 +238,7 @@ class DatabaseIntegrationTests {
         fun `clearAggregatesForAsset removes all aggregates for the asset`() = runTest {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
 
-            val manager = UserAggregationManager(db, AggregationService())
+            val manager = createManager()
             manager.regenerateAggregatesForAsset(assetId)
 
             // Verify something exists
@@ -250,7 +259,7 @@ class DatabaseIntegrationTests {
         fun `regenerateAggregatesForAsset clears old aggregates before writing new ones`() = runTest {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
 
-            val manager = UserAggregationManager(db, AggregationService())
+            val manager = createManager()
             manager.regenerateAggregatesForAsset(assetId)
 
             val countFirst = transaction(db) {
@@ -271,7 +280,7 @@ class DatabaseIntegrationTests {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
             insertTx(otherAssetId, baseTime, AssetTransactionType.Trade, 99.0, 990.0)
 
-            val manager = UserAggregationManager(db, AggregationService())
+            val manager = createManager()
             manager.regenerateAggregatesForAsset(assetId)
             manager.regenerateAggregatesForAsset(otherAssetId)
 
@@ -301,7 +310,7 @@ class DatabaseIntegrationTests {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
             insertTx(otherAssetId, baseTime, AssetTransactionType.Trade, 20.0, 200.0)
 
-            val manager = UserAggregationManager(db, AggregationService())
+            val manager = createManager()
             manager.forceAggregateUserAssets(userId)
 
             val assetAggs = transaction(db) {
@@ -317,7 +326,7 @@ class DatabaseIntegrationTests {
 
         @Test
         fun `forceAggregateUserAssets with unknown user id produces no aggregates`() = runTest {
-            val manager = UserAggregationManager(db, AggregationService())
+            val manager = createManager()
             manager.forceAggregateUserAssets(Uuid.random())
 
             val totalAggs = transaction(db) {
@@ -328,7 +337,7 @@ class DatabaseIntegrationTests {
 
         @Test
         fun `regenerateAggregatesForAsset with no transactions writes nothing`() = runTest {
-            val manager = UserAggregationManager(db, AggregationService())
+            val manager = createManager()
             manager.regenerateAggregatesForAsset(assetId)
 
             val count = transaction(db) {
@@ -346,7 +355,7 @@ class DatabaseIntegrationTests {
             insertTx(assetId, day2, AssetTransactionType.Reconciliation, 15.0, 150.0)
             insertTx(assetId, day2 + 1.minutes, AssetTransactionType.Trade, 3.0, 30.0)
 
-            val manager = UserAggregationManager(db, AggregationService())
+            val manager = createManager()
             manager.regenerateAggregatesForAsset(assetId)
 
             val aggregates = transaction(db) {
@@ -356,15 +365,15 @@ class DatabaseIntegrationTests {
                     .toList()
             }
 
-            // First day: trade of 10
+            // First day: trade of 10 units @ $10/unit = $100
             val first = aggregates[0]
-            first[AssetAggregate.totalValue] shouldBeExactly 10.0
+            first[AssetAggregate.totalValue] shouldBeExactly 100.0
             first[AssetAggregate.deltaTrades] shouldBeExactly 10.0
             first[AssetAggregate.deltaReconciliation] shouldBeExactly 0.0
 
-            // Second day: reconciliation to 15, then trade +3 = 18
+            // Second day: reconciliation to 15 @ $10/unit, then trade +3 @ $10/unit = 18 units, $180
             val second = aggregates[1]
-            second[AssetAggregate.totalValue] shouldBeExactly 18.0
+            second[AssetAggregate.totalValue] shouldBeExactly 180.0
             second[AssetAggregate.deltaReconciliation] shouldBeExactly 15.0
             second[AssetAggregate.deltaTrades] shouldBeExactly 3.0
         }
@@ -373,7 +382,7 @@ class DatabaseIntegrationTests {
         fun `regenerateAggregatesForAsset sets aggregatedThrough to today`() = runTest {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
 
-            val manager = UserAggregationManager(db, AggregationService())
+            val manager = createManager()
             manager.regenerateAggregatesForAsset(assetId)
 
             val aggregatedThrough = transaction(db) {
@@ -396,7 +405,7 @@ class DatabaseIntegrationTests {
         fun `ensureAllAggregationsUpToDate regenerates assets with null aggregatedThrough`() = runTest {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
 
-            val manager = UserAggregationManager(db, AggregationService())
+            val manager = createManager()
             manager.ensureAllAggregationsUpToDate()
 
             val count = transaction(db) {
@@ -414,7 +423,7 @@ class DatabaseIntegrationTests {
         fun `ensureAllAggregationsUpToDate skips assets already aggregated through today`() = runTest {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
 
-            val manager = UserAggregationManager(db, AggregationService())
+            val manager = createManager()
             // First call aggregates
             manager.regenerateAggregatesForAsset(assetId)
 
@@ -442,7 +451,7 @@ class DatabaseIntegrationTests {
         @Test
         fun `ensureAllAggregationsUpToDate handles assets with no transactions gracefully`() = runTest {
             // assetId has no transactions
-            val manager = UserAggregationManager(db, AggregationService())
+            val manager = createManager()
             manager.ensureAllAggregationsUpToDate()
 
             val count = transaction(db) {
@@ -456,7 +465,7 @@ class DatabaseIntegrationTests {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
             insertTx(otherAssetId, baseTime, AssetTransactionType.Trade, 20.0, 200.0)
 
-            val manager = UserAggregationManager(db, AggregationService())
+            val manager = createManager()
             manager.ensureAllAggregationsUpToDate()
 
             val assetAggs = transaction(db) {

@@ -9,6 +9,7 @@ object AssetAggregate: Table("generated_asset_aggregate") {
     val assetId = uuid("asset_id").references(Asset.id)
     val aggregationPeriod = enumeration("aggregation_period", AggregationPeriod::class)
     val totalValue = double("total_value")
+    val holding = double("holding").default(0.0)
     // The end date of the period this aggregate represents
     val periodEndDate = date("period_end_date")
 
@@ -17,6 +18,12 @@ object AssetAggregate: Table("generated_asset_aggregate") {
     val deltaReconciliation = double("delta_reconciliation").default(0.0)
     val deltaTrades = double("delta_trades").default(0.0)
     val deltaOther = double("delta_other").default(0.0)
+
+    /** Per-unit market price (for market-data assets); null for manual/USER assets. */
+    val unitPrice = double("unit_price").nullable().default(null)
+
+    /** The date from which the unit price was sourced (may differ from periodEndDate due to carry-forward). */
+    val valueDate = date("value_date").nullable().default(null)
 
     override val primaryKey: PrimaryKey
         get() = PrimaryKey(assetId, aggregationPeriod, periodEndDate)
