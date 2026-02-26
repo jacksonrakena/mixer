@@ -2,11 +2,14 @@ package com.jacksonrakena.mixer.core.requests
 
 import com.jacksonrakena.mixer.data.UserAggregationManager
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
+import com.jacksonrakena.mixer.data.tables.concrete.User
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.TimeZone
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.update
+import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jobrunr.jobs.lambdas.JobRequest
 import org.jobrunr.jobs.lambdas.JobRequestHandler
@@ -37,8 +40,14 @@ class RecomputeAssetAggregationRequest(
 
             MDC.put("assetId", request.assetId.toString())
             try {
+                val userTimezone = transaction {
+                    val ownerId = Asset.selectAll().where { Asset.id eq request.assetId }.first()[Asset.ownerId]
+                    val tz = User.selectAll().where { User.id eq ownerId }.first()[User.timezone]
+                    TimeZone.of(tz)
+                }
+
                 runBlocking {
-                    userAggregationManager.regenerateAggregatesForAsset(request.assetId)
+                    userAggregationManager.regenerateAggregatesForAsset(request.assetId, userTimezone)
                 }
 
                 transaction {

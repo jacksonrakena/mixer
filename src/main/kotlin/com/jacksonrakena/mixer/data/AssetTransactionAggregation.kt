@@ -44,10 +44,10 @@ data class AssetTransactionAggregation(
     val valueDate: LocalDate? = null,
 ) {
     companion object {
-        fun fromResultRow(row: ResultRow): AssetTransactionAggregation {
+        fun fromResultRow(row: ResultRow, userTimezone: TimeZone): AssetTransactionAggregation {
             return AssetTransactionAggregation(
                 assetId = row[AssetAggregate.assetId],
-                date = row[AssetAggregate.periodEndDate].atStartOfDayIn(TimeZone.Companion.currentSystemDefault()).toJavaInstant().toKotlinInstant(),
+                date = row[AssetAggregate.periodEndDate].atStartOfDayIn(userTimezone).toJavaInstant().toKotlinInstant(),
                 amount = row[AssetAggregate.holding],
                 amountDeltaTrades = row[AssetAggregate.deltaTrades],
                 amountDeltaReconciliation = row[AssetAggregate.deltaReconciliation],

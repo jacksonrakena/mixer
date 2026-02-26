@@ -313,7 +313,7 @@ export default function HomePage({ displayCurrency }: HomePageProps) {
                 series={[{
                   data: yValues,
                   label: 'Portfolio',
-                  color: '#3b82f6',
+                  color: 'var(--joy-palette-primary-500)',
                   showMark: false,
                   area: true,
                 }]}
@@ -323,7 +323,7 @@ export default function HomePage({ displayCurrency }: HomePageProps) {
                   valueFormatter: (v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
                 }]}
                 yAxis={[{ width: 70 }]}
-                slotProps={{ tooltip: { trigger: 'none' }, axisHighlight: { x: 'none', y: 'none' } }}
+                slotProps={{ tooltip: { trigger: 'none' }, axisHighlight: { x: 'none', y: 'none' }, legend: { hidden: true } }}
                 sx={{
                   '& .MuiLineElement-root': { strokeWidth: 2 },
                   '& .MuiAreaElement-root': { fillOpacity: 0.1 },

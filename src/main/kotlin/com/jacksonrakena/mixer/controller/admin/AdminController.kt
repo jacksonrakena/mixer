@@ -1,7 +1,7 @@
 package com.jacksonrakena.mixer.controller.admin
 
+import com.jacksonrakena.mixer.core.requests.RecomputeUserAggregationRequest
 import com.jacksonrakena.mixer.controller.auth.UserResponse
-import com.jacksonrakena.mixer.data.UserAggregationManager
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import com.jacksonrakena.mixer.data.tables.concrete.Transaction
 import com.jacksonrakena.mixer.data.tables.concrete.User
@@ -9,13 +9,13 @@ import com.jacksonrakena.mixer.data.tables.concrete.UserRole
 import com.jacksonrakena.mixer.data.tables.virtual.AssetAggregate
 import com.jacksonrakena.mixer.data.tables.markets.ExchangeRate
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jobrunr.scheduling.JobRequestScheduler
 import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.web.bind.annotation.*
@@ -46,7 +46,7 @@ data class EntityCounts(
 @RequestMapping("/admin")
 class AdminController(
     private val passwordEncoder: PasswordEncoder,
-    private val userAggregationManager: UserAggregationManager,
+    private val jobRequestScheduler: JobRequestScheduler,
 ) {
 
     @GetMapping("/users")
@@ -102,15 +102,19 @@ class AdminController(
 
         logger.info { "Admin created user: ${request.email} (id=$userId, verified=${request.emailVerified})" }
 
+        val user = transaction {
+            User.selectAll().where { User.id eq userId }.first()
+        }
+
         return UserResponse(
             id = userId,
-            email = request.email.lowercase().trim(),
-            displayName = request.displayName.trim(),
-            emailVerified = request.emailVerified,
-            timezone = "Australia/Sydney",
-            displayCurrency = "AUD",
+            email = user[User.email],
+            displayName = user[User.displayName],
+            emailVerified = user[User.emailVerified],
+            timezone = user[User.timezone],
+            displayCurrency = user[User.displayCurrency],
             roles = emptyList(),
-            createdAt = now,
+            createdAt = user[User.createdAt],
         )
     }
 
@@ -141,15 +145,11 @@ class AdminController(
         val userIds = transaction {
             User.selectAll().map { it[User.id] }
         }
-        logger.info { "Admin force reaggregating all users (${userIds.size} users)" }
-        var count = 0
-        runBlocking {
-            for (uid in userIds) {
-                userAggregationManager.forceAggregateUserAssets(uid)
-                count++
-            }
+        logger.info { "Admin force reaggregating all users (${userIds.size} users), enqueuing background jobs" }
+        for (uid in userIds) {
+            jobRequestScheduler.enqueue(RecomputeUserAggregationRequest(uid))
         }
-        return mapOf("status" to "ok", "usersProcessed" to count)
+        return mapOf("status" to "queued", "usersEnqueued" to userIds.size)
     }
 
     @GetMapping("/debug/counts")

@@ -26,6 +26,7 @@ import {
   type TransactionDto,
   type CreateTransactionResponse,
 } from './api'
+import { useAuth } from './AuthContext'
 
 interface TransactionPanelProps {
   assetId: string
@@ -35,23 +36,27 @@ interface TransactionPanelProps {
 const TRANSACTION_TYPES: TransactionType[] = ['Trade', 'Reconciliation']
 const PAGE_SIZE = 10
 
-function formatDate(epochMs: number) {
+function formatDate(epochMs: number, tz?: string) {
   return new Date(epochMs).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
+    timeZone: tz,
   })
 }
 
-function formatDateTime(epochMs: number) {
+function formatDateTime(epochMs: number, tz?: string) {
   return new Date(epochMs).toLocaleString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
     hour: 'numeric', minute: '2-digit',
+    timeZone: tz,
+    timeZoneName: 'short',
   })
 }
 
-function formatFullDateTime(epochMs: number) {
+function formatFullDateTime(epochMs: number, tz?: string) {
   return new Date(epochMs).toLocaleString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
     hour: 'numeric', minute: '2-digit', second: '2-digit',
+    timeZone: tz,
     timeZoneName: 'short',
   })
 }
@@ -73,6 +78,8 @@ function paginationRange(current: number, total: number): (number | 'ellipsis')[
 }
 
 export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPanelProps) => {
+  const { user } = useAuth()
+  const tz = user?.timezone
   const [type, setType] = useState<TransactionType>('Trade')
   const [amount, setAmount] = useState('')
   const [value, setValue] = useState('')
@@ -298,7 +305,7 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <Typography level="body-xs" sx={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                          {formatDateTime(tx.timestamp)}
+                          {formatDateTime(tx.timestamp, tz)}
                         </Typography>
                       </td>
                     </tr>
@@ -394,7 +401,7 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
                   />
                 )}
                 <Divider />
-                <DetailRow label="Date & Time" value={formatFullDateTime(selectedTx.timestamp)} />
+                <DetailRow label="Date & Time" value={formatFullDateTime(selectedTx.timestamp, tz)} />
                 <DetailRow label="Asset ID" value={selectedTx.assetId} mono />
               </Box>
             </DialogContent>

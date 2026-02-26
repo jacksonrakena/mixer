@@ -3,6 +3,7 @@ package com.jacksonrakena.mixer.data
 import com.jacksonrakena.mixer.data.market.MarketDataProvider
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import com.jacksonrakena.mixer.data.tables.concrete.Transaction
+import com.jacksonrakena.mixer.data.tables.concrete.User
 import com.jacksonrakena.mixer.data.tables.virtual.AssetAggregate
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.LocalDate
@@ -43,14 +44,16 @@ class UserAggregationManager(
     suspend fun forceAggregateUserAssets(
         userId: Uuid
     ) {
-        val existingAssets = transaction {
-            Asset.selectAll().where { Asset.ownerId.eq(userId) }.toList()
+        val (existingAssets, userTimezone) = transaction {
+            val assets = Asset.selectAll().where { Asset.ownerId.eq(userId) }.toList()
+            val tz = User.selectAll().where { User.id eq userId }.first()[User.timezone]
+            Pair(assets, TimeZone.of(tz))
         }
         MDC.put("userId", userId.toString())
         try {
-            logger.info { "Forcing aggregation for user $userId, total ${existingAssets.size} assets" }
+            logger.info { "Forcing aggregation for user $userId (tz=$userTimezone), total ${existingAssets.size} assets" }
             for (asset in existingAssets) {
-                regenerateAggregatesForAsset(asset[Asset.id])
+                regenerateAggregatesForAsset(asset[Asset.id], userTimezone)
             }
         } finally {
             MDC.remove("userId")
@@ -149,12 +152,13 @@ class UserAggregationManager(
     }
 
     suspend fun regenerateAggregatesForAsset(
-        assetId: Uuid
+        assetId: Uuid,
+        userTimezone: TimeZone,
     ) {
         clearAggregatesForAsset(assetId)
         MDC.put("assetId", assetId.toString())
         try {
-            val today = Clock.System.now().toLocalDateTime(TimeZone.Companion.currentSystemDefault()).date
+            val today = Clock.System.now().toLocalDateTime(userTimezone).date
 
             // Resolve provider info for market data lookup
             val (provider, providerData) = transaction {
@@ -167,7 +171,7 @@ class UserAggregationManager(
 
             val aggregates = aggregationService.forwardAggregate(
                 assetId,
-                TimeZone.Companion.currentSystemDefault(),
+                userTimezone,
                 DatabaseAssetTransactionSource(),
                 today,
                 marketPrices,
@@ -177,7 +181,7 @@ class UserAggregationManager(
                     this[AssetAggregate.assetId] = assetId
                     this[AssetAggregate.aggregationPeriod] = AggregationPeriod.DAILY
                     this[AssetAggregate.periodEndDate] =
-                        agg.date.toLocalDateTime(TimeZone.Companion.currentSystemDefault()).date
+                        agg.date.toLocalDateTime(userTimezone).date
                     this[AssetAggregate.totalValue] = agg.nativeValue
                     this[AssetAggregate.holding] = agg.amount
                     this[AssetAggregate.deltaReconciliation] = agg.amountDeltaReconciliation
@@ -240,23 +244,26 @@ class UserAggregationManager(
     /**
      * Checks all assets in the database and regenerates aggregations for any
      * whose [Asset.aggregatedThrough] is behind today's date or has never been computed.
-     * Assets with no transactions are skipped.
+     * Each asset's "today" is determined by its owner's configured timezone.
      */
     suspend fun ensureAllAggregationsUpToDate() {
-        val today = Clock.System.now().toLocalDateTime(TimeZone.Companion.currentSystemDefault()).date
-        val staleAssets = transaction {
-            Asset.selectAll()
-                .where { (Asset.aggregatedThrough less today) or (Asset.aggregatedThrough.isNull()) }
-                .map { it[Asset.id] }
+        val allAssets = transaction {
+            (Asset innerJoin User)
+                .selectAll()
+                .map { Triple(it[Asset.id], TimeZone.of(it[User.timezone]), it[Asset.aggregatedThrough]) }
+        }
+        val staleAssets = allAssets.filter { (_, tz, aggregatedThrough) ->
+            val userToday = Clock.System.now().toLocalDateTime(tz).date
+            aggregatedThrough == null || aggregatedThrough < userToday
         }
         if (staleAssets.isEmpty()) {
-            logger.debug { "All asset aggregations are up-to-date through $today" }
+            logger.debug { "All asset aggregations are up-to-date" }
             return
         }
-        logger.info { "Found ${staleAssets.size} assets needing aggregation refresh through $today" }
-        for (assetId in staleAssets) {
+        logger.info { "Found ${staleAssets.size} assets needing aggregation refresh" }
+        for ((assetId, userTimezone, _) in staleAssets) {
             try {
-                regenerateAggregatesForAsset(assetId)
+                regenerateAggregatesForAsset(assetId, userTimezone)
             } catch (e: Exception) {
                 logger.error(e) { "Failed to refresh aggregations for asset $assetId" }
             }

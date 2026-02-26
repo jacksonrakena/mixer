@@ -1,38 +1,44 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
-import { CssVarsProvider, extendTheme } from '@mui/joy/styles'
-import CssBaseline from '@mui/joy/CssBaseline'
-import Box from '@mui/joy/Box'
-import CircularProgress from '@mui/joy/CircularProgress'
-import './index.css'
-import App from './App.tsx'
-import { AuthProvider, useAuth } from './AuthContext.tsx'
-import LoginPage from './pages/LoginPage.tsx'
-import SignupPage from './pages/SignupPage.tsx'
-import ProfilePage from './pages/ProfilePage.tsx'
-import AdminPage from './pages/AdminPage.tsx'
-import HomePage from './pages/HomePage.tsx'
-import AssetPage from './pages/AssetPage.tsx'
-import { useOutletContext } from 'react-router-dom'
-import type { SupportedCurrency } from './api'
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+} from "react-router-dom";
+import { CssVarsProvider, extendTheme } from "@mui/joy/styles";
+import CssBaseline from "@mui/joy/CssBaseline";
+import Box from "@mui/joy/Box";
+import CircularProgress from "@mui/joy/CircularProgress";
+import "./index.css";
+import App from "./App.tsx";
+import { AuthProvider, useAuth } from "./AuthContext.tsx";
+import LoginPage from "./pages/LoginPage.tsx";
+import SignupPage from "./pages/SignupPage.tsx";
+import ProfilePage from "./pages/ProfilePage.tsx";
+import AdminPage from "./pages/AdminPage.tsx";
+import HomePage from "./pages/HomePage.tsx";
+import AssetPage from "./pages/AssetPage.tsx";
+import { useOutletContext } from "react-router-dom";
+import type { SupportedCurrency } from "./api";
 
 interface AppContext {
-  displayCurrency: SupportedCurrency
+  displayCurrency: SupportedCurrency;
 }
 
 export function useAppContext() {
-  return useOutletContext<AppContext>()
+  return useOutletContext<AppContext>();
 }
 
 function HomeWrapper() {
-  const { displayCurrency } = useAppContext()
-  return <HomePage displayCurrency={displayCurrency} />
+  const { displayCurrency } = useAppContext();
+  return <HomePage displayCurrency={displayCurrency} />;
 }
 
 function AssetWrapper() {
-  const { displayCurrency } = useAppContext()
-  return <AssetPage displayCurrency={displayCurrency} />
+  const { displayCurrency } = useAppContext();
+  return <AssetPage displayCurrency={displayCurrency} />;
 }
 
 const theme = extendTheme({
@@ -40,32 +46,32 @@ const theme = extendTheme({
     light: {
       palette: {
         primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
+          "50": "#e0f2f1",
+          "100": "#b2dfdb",
+          "200": "#80cbc4",
+          "300": "#4db6ac",
+          "400": "#26a69a",
+          "500": "#009688",
+          "600": "#00897b",
+          "700": "#00796b",
+          "800": "#00695c",
+          "900": "#004d40",
         },
         background: {
-          body: '#f8fafc',
-          surface: '#ffffff',
+          body: "#f8fafc",
+          surface: "#ffffff",
         },
         neutral: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
+          50: "#f8fafc",
+          100: "#f1f5f9",
+          200: "#e2e8f0",
+          300: "#cbd5e1",
+          400: "#94a3b8",
+          500: "#64748b",
+          600: "#475569",
+          700: "#334155",
+          800: "#1e293b",
+          900: "#0f172a",
         },
       },
     },
@@ -74,29 +80,37 @@ const theme = extendTheme({
     body: "'IBM Plex Sans', 'system-ui', sans-serif",
     display: "'IBM Plex Sans', 'system-ui', sans-serif",
   },
-})
+});
 
 function ProtectedRoute() {
-  const { user, loading } = useAuth()
+  const { user, loading } = useAuth();
   if (loading) {
     return (
-      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--joy-palette-background-body)' }}>
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "var(--joy-palette-background-body)",
+        }}
+      >
         <CircularProgress size="lg" />
       </Box>
-    )
+    );
   }
-  if (!user) return <Navigate to="/login" replace />
-  return <Outlet />
+  if (!user) return <Navigate to="/login" replace />;
+  return <Outlet />;
 }
 
 function PublicRoute() {
-  const { user, loading } = useAuth()
-  if (loading) return null
-  if (user) return <Navigate to="/" replace />
-  return <Outlet />
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (user) return <Navigate to="/" replace />;
+  return <Outlet />;
 }
 
-createRoot(document.getElementById('root')!).render(
+createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <CssVarsProvider theme={theme} defaultMode="light">
       <CssBaseline />
@@ -120,4 +134,4 @@ createRoot(document.getElementById('root')!).render(
       </BrowserRouter>
     </CssVarsProvider>
   </StrictMode>,
-)
+);

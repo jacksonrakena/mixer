@@ -835,7 +835,7 @@ export const AssetChart = ({
                 <CircularProgress
                   size="md"
                   sx={{
-                    "--CircularProgress-trackColor": "rgba(59,130,246,0.15)",
+                    "--CircularProgress-trackColor": "var(--joy-palette-primary-100)",
                   }}
                 />
                 <Typography
@@ -893,7 +893,7 @@ export const AssetChart = ({
                 {
                   data: yValues,
                   label: assetName,
-                  color: "#3b82f6",
+                  color: "var(--joy-palette-primary-500)",
                   showMark: false,
                   area: true,
                 },

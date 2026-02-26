@@ -1,5 +1,6 @@
 package com.jacksonrakena.mixer.controller.auth
 
+import com.jacksonrakena.mixer.core.requests.RecomputeUserAggregationRequest
 import com.jacksonrakena.mixer.data.tables.concrete.User
 import com.jacksonrakena.mixer.data.tables.concrete.UserRole
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -11,6 +12,7 @@ import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
+import org.jobrunr.scheduling.JobRequestScheduler
 import org.springframework.http.HttpStatus
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.authority.SimpleGrantedAuthority
@@ -59,6 +61,7 @@ data class UpdateProfileRequest(
 @RequestMapping("/auth")
 class AuthController(
     private val passwordEncoder: PasswordEncoder,
+    private val jobRequestScheduler: JobRequestScheduler,
 ) {
     private val securityContextRepository = HttpSessionSecurityContextRepository()
 
@@ -103,15 +106,20 @@ class AuthController(
         val roles = emptyList<String>()
         setAuthentication(userId, roles, httpRequest, httpResponse)
 
+        // Read back the created user to return actual defaults from the DB schema
+        val user = transaction {
+            User.selectAll().where { User.id eq userId }.first()
+        }
+
         return UserResponse(
             id = userId,
-            email = request.email.lowercase().trim(),
-            displayName = request.displayName.trim(),
-            emailVerified = false,
-            timezone = "Australia/Sydney",
-            displayCurrency = "AUD",
+            email = user[User.email],
+            displayName = user[User.displayName],
+            emailVerified = user[User.emailVerified],
+            timezone = user[User.timezone],
+            displayCurrency = user[User.displayCurrency],
             roles = roles,
-            createdAt = now,
+            createdAt = user[User.createdAt],
         )
     }
 
@@ -194,6 +202,15 @@ class AuthController(
     @PutMapping("/profile")
     fun updateProfile(@RequestBody request: UpdateProfileRequest): UserResponse {
         val userId = currentUserId()
+
+        // Check if timezone is changing — requires full reaggregation
+        val timezoneChanged = request.timezone?.let { newTz ->
+            val currentTz = transaction {
+                User.selectAll().where { User.id eq userId }.first()[User.timezone]
+            }
+            currentTz != newTz
+        } ?: false
+
         transaction {
             User.update({ User.id eq userId }) {
                 request.displayName?.let { dn -> it[displayName] = dn.trim() }
@@ -201,6 +218,12 @@ class AuthController(
                 request.displayCurrency?.let { dc -> it[displayCurrency] = dc }
             }
         }
+
+        if (timezoneChanged) {
+            logger.info { "Timezone changed for user $userId, enqueuing reaggregation" }
+            jobRequestScheduler.enqueue(RecomputeUserAggregationRequest(userId))
+        }
+
         return me()
     }
 

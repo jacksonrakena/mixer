@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useMemo, type FormEvent } from 'react'
 import Box from '@mui/joy/Box'
 import Sheet from '@mui/joy/Sheet'
 import Typography from '@mui/joy/Typography'
@@ -6,11 +6,14 @@ import Input from '@mui/joy/Input'
 import Button from '@mui/joy/Button'
 import Select from '@mui/joy/Select'
 import Option from '@mui/joy/Option'
+import Autocomplete from '@mui/joy/Autocomplete'
 import Alert from '@mui/joy/Alert'
 import Chip from '@mui/joy/Chip'
 import Divider from '@mui/joy/Divider'
 import { useAuth } from '../AuthContext'
 import { updateProfile, SUPPORTED_CURRENCIES, type SupportedCurrency } from '../api'
+
+const TIMEZONES: string[] = Intl.supportedValuesOf('timeZone')
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth()
@@ -123,9 +126,12 @@ export default function ProfilePage() {
           <Typography level="body-sm" sx={{ color: 'neutral.400', mb: 0.5 }}>
             Timezone
           </Typography>
-          <Input
+          <Autocomplete
             value={timezone}
-            onChange={(e) => setTimezone(e.target.value)}
+            onChange={(_, val) => val && setTimezone(val)}
+            options={TIMEZONES}
+            placeholder="Select timezone…"
+            size="sm"
             sx={{ mb: 2 }}
           />
 
