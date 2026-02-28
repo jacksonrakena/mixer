@@ -1,5 +1,6 @@
 package com.jacksonrakena.mixer.controller.auth
 
+import com.jacksonrakena.mixer.MixerConfiguration
 import com.jacksonrakena.mixer.core.requests.RecomputeUserAggregationRequest
 import com.jacksonrakena.mixer.data.tables.concrete.User
 import com.jacksonrakena.mixer.data.tables.concrete.UserRole
@@ -68,6 +69,7 @@ data class ChangePasswordRequest(
 class AuthController(
     private val passwordEncoder: PasswordEncoder,
     private val jobRequestScheduler: JobRequestScheduler,
+    private val mixerConfiguration: MixerConfiguration,
 ) {
     private val securityContextRepository = HttpSessionSecurityContextRepository()
 
@@ -77,6 +79,9 @@ class AuthController(
         httpRequest: HttpServletRequest,
         httpResponse: HttpServletResponse,
     ): UserResponse {
+        if (!mixerConfiguration.user.signup.enabled) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Signup is disabled")
+        }
         if (request.email.isBlank() || !request.email.contains("@")) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid email")
         }

@@ -1,5 +1,14 @@
-// API base URL - proxied through Vite dev server
-const BASE = "/api";
+// API base URL - in production, set window.__MIXER_CONFIG__.apiBase via env var
+const BASE = (window as any).__MIXER_CONFIG__?.apiBase || "/api";
+
+/**
+ * Wrapper around fetch that always includes credentials (cookies).
+ * Required because the frontend and API are on different subdomains
+ * (e.g. finance.rakena.com.au vs finance-api.rakena.com.au).
+ */
+function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  return fetch(input, { ...init, credentials: "include" });
+}
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -94,7 +103,7 @@ export interface AssetAggregation {
 // ── Assets ───────────────────────────────────────────────────────────────────
 
 export async function fetchAssets(): Promise<AssetDto[]> {
-  const res = await fetch(`${BASE}/asset`);
+  const res = await apiFetch(`${BASE}/asset`);
   if (!res.ok) throw new Error(`Failed to fetch assets: ${res.status}`);
   return res.json();
 }
@@ -102,7 +111,7 @@ export async function fetchAssets(): Promise<AssetDto[]> {
 export async function createAsset(
   req: CreateAssetRequest,
 ): Promise<CreateAssetResponse> {
-  const res = await fetch(`${BASE}/asset`, {
+  const res = await apiFetch(`${BASE}/asset`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
@@ -114,7 +123,7 @@ export async function createAsset(
 export async function deleteAsset(
   assetId: string,
 ): Promise<DeleteAssetResponse> {
-  const res = await fetch(`${BASE}/asset/${assetId}`, { method: "DELETE" });
+  const res = await apiFetch(`${BASE}/asset/${assetId}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Failed to delete asset: ${res.status}`);
   return res.json();
 }
@@ -125,7 +134,7 @@ export async function createTransaction(
   assetId: string,
   req: CreateTransactionRequest,
 ): Promise<CreateTransactionResponse> {
-  const res = await fetch(`${BASE}/asset/${assetId}/transaction`, {
+  const res = await apiFetch(`${BASE}/asset/${assetId}/transaction`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
@@ -138,7 +147,7 @@ export async function deleteTransaction(
   assetId: string,
   transactionId: string,
 ): Promise<DeleteTransactionResponse> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${BASE}/asset/${assetId}/transaction/${transactionId}`,
     {
       method: "DELETE",
@@ -172,7 +181,7 @@ export async function fetchTransactions(
   page: number = 0,
   size: number = 10,
 ): Promise<PaginatedTransactionsResponse> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${BASE}/asset/${assetId}/transaction?page=${page}&size=${size}`,
   );
   if (!res.ok) throw new Error(`Failed to fetch transactions: ${res.status}`);
@@ -190,7 +199,7 @@ export async function fetchAggregation(
   const params = displayCurrency
     ? `?displayCurrency=${encodeURIComponent(displayCurrency)}`
     : "";
-  const res = await fetch(
+  const res = await apiFetch(
     `${BASE}/agg/asset/${assetId}/${start}/${end}${params}`,
   );
   if (!res.ok) throw new Error(`Failed to fetch aggregation: ${res.status}`);
@@ -204,7 +213,7 @@ export async function fetchAllAggregations(
   const params = displayCurrency
     ? `?displayCurrency=${encodeURIComponent(displayCurrency)}`
     : "";
-  const res = await fetch(`${BASE}/agg/asset/${assetId}/all${params}`);
+  const res = await apiFetch(`${BASE}/agg/asset/${assetId}/all${params}`);
   if (!res.ok)
     throw new Error(`Failed to fetch all aggregations: ${res.status}`);
   return res.json();
@@ -235,7 +244,7 @@ export async function fetchPortfolioAggregation(
   const params = displayCurrency
     ? `?displayCurrency=${encodeURIComponent(displayCurrency)}`
     : "";
-  const res = await fetch(
+  const res = await apiFetch(
     `${BASE}/agg/portfolio/${start}/${end}${params}`,
   );
   if (!res.ok)
@@ -249,7 +258,7 @@ export async function fetchAllPortfolioAggregation(
   const params = displayCurrency
     ? `?displayCurrency=${encodeURIComponent(displayCurrency)}`
     : "";
-  const res = await fetch(`${BASE}/agg/portfolio/all${params}`);
+  const res = await apiFetch(`${BASE}/agg/portfolio/all${params}`);
   if (!res.ok)
     throw new Error(`Failed to fetch portfolio: ${res.status}`);
   return res.json();
@@ -265,7 +274,7 @@ let _configCache: ClientConfig | null = null;
 
 export async function fetchConfig(): Promise<ClientConfig> {
   if (_configCache) return _configCache;
-  const res = await fetch(`${BASE}/config`, { credentials: "include" });
+  const res = await apiFetch(`${BASE}/config`);
   if (!res.ok) throw new Error("Failed to fetch config");
   _configCache = await res.json();
   return _configCache!;
@@ -292,7 +301,7 @@ export interface AssetStalenessResponse {
 export async function fetchAssetStaleness(
   assetId: string,
 ): Promise<AssetStalenessResponse> {
-  const res = await fetch(`${BASE}/asset/${assetId}/staleness`);
+  const res = await apiFetch(`${BASE}/asset/${assetId}/staleness`);
   if (!res.ok) throw new Error(`Failed to fetch staleness: ${res.status}`);
   return res.json();
 }
@@ -325,7 +334,7 @@ export async function login(
   email: string,
   password: string,
 ): Promise<UserResponse> {
-  const res = await fetch(`${BASE}/auth/login`, {
+  const res = await apiFetch(`${BASE}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -345,7 +354,7 @@ export async function signup(
   password: string,
   displayName: string,
 ): Promise<UserResponse> {
-  const res = await fetch(`${BASE}/auth/signup`, {
+  const res = await apiFetch(`${BASE}/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, displayName }),
@@ -359,11 +368,11 @@ export async function signup(
 }
 
 export async function logout(): Promise<void> {
-  await fetch(`${BASE}/auth/logout`, { method: "POST" });
+  await apiFetch(`${BASE}/auth/logout`, { method: "POST" });
 }
 
 export async function fetchMe(): Promise<UserResponse> {
-  const res = await fetch(`${BASE}/auth/me`);
+  const res = await apiFetch(`${BASE}/auth/me`);
   if (!res.ok) throw new Error("Not authenticated");
   return res.json();
 }
@@ -373,7 +382,7 @@ export async function updateProfile(req: {
   timezone?: string;
   displayCurrency?: string;
 }): Promise<UserResponse> {
-  const res = await fetch(`${BASE}/auth/profile`, {
+  const res = await apiFetch(`${BASE}/auth/profile`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
@@ -386,7 +395,7 @@ export async function changePassword(req: {
   currentPassword: string;
   newPassword: string;
 }): Promise<void> {
-  const res = await fetch(`${BASE}/auth/password`, {
+  const res = await apiFetch(`${BASE}/auth/password`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
@@ -404,7 +413,7 @@ export async function changePassword(req: {
 // ── Admin ─────────────────────────────────────────────────────────────────────
 
 export async function fetchAdminUsers(): Promise<UserResponse[]> {
-  const res = await fetch(`${BASE}/admin/users`);
+  const res = await apiFetch(`${BASE}/admin/users`);
   if (!res.ok) throw new Error(`Failed to fetch users: ${res.status}`);
   return res.json();
 }
@@ -419,7 +428,7 @@ export interface AdminCreateUserRequest {
 export async function adminCreateUser(
   request: AdminCreateUserRequest,
 ): Promise<UserResponse> {
-  const res = await fetch(`${BASE}/admin/users`, {
+  const res = await apiFetch(`${BASE}/admin/users`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
@@ -432,7 +441,7 @@ export async function adminCreateUser(
 }
 
 export async function adminDeleteUser(userId: string): Promise<void> {
-  const res = await fetch(`${BASE}/admin/users/${userId}`, {
+  const res = await apiFetch(`${BASE}/admin/users/${userId}`, {
     method: "DELETE",
   });
   if (!res.ok) {
@@ -445,7 +454,7 @@ export async function adminForceReaggregateAll(): Promise<{
   status: string;
   usersProcessed: number;
 }> {
-  const res = await fetch(`${BASE}/admin/aggregations/force-all`, {
+  const res = await apiFetch(`${BASE}/admin/aggregations/force-all`, {
     method: "POST",
   });
   if (!res.ok) throw new Error(`Failed to reaggregate: ${res.status}`);
@@ -462,7 +471,7 @@ export interface EntityCounts {
 }
 
 export async function adminFetchDebugCounts(): Promise<EntityCounts> {
-  const res = await fetch(`${BASE}/admin/debug/counts`);
+  const res = await apiFetch(`${BASE}/admin/debug/counts`);
   if (!res.ok) throw new Error(`Failed to fetch counts: ${res.status}`);
   return res.json();
 }

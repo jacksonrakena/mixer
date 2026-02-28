@@ -20,6 +20,7 @@ data class MixerConfiguration(
     val refresh: RefreshConfiguration = RefreshConfiguration(),
     val fx: FxConfiguration = FxConfiguration(),
     val data: DataConfiguration = DataConfiguration(),
+    val user: UserConfiguration = UserConfiguration(),
 ) {
     @Bean
     fun restClient(): RestClient = RestClient.create()
@@ -51,6 +52,14 @@ data class DataConfiguration(
 
 data class SeedConfiguration(
     val insert: Boolean = true,
+)
+
+data class UserConfiguration(
+    val signup: SignupConfiguration = SignupConfiguration(),
+)
+
+data class SignupConfiguration(
+    val enabled: Boolean = true,
 )
 @Configuration
 class SerializationConfiguration {
