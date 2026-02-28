@@ -17,6 +17,5 @@ data class CurrencyRangeResponse(
     val rates: Map<Instant, Double>
 )
 interface CurrencyService {
-    fun getExchangeRate(base: String, pair: String): CurrencyResponse
-    fun getHistoricExchangeRates(pair: Pair<String, String>): CurrencyRangeResponse
+    fun getHistoricExchangeRates(pair: Pair<String, String>, from: java.time.ZonedDateTime? = null): CurrencyRangeResponse
 }

@@ -120,6 +120,29 @@ export default function HomePage({ displayCurrency }: HomePageProps) {
     fetchAssets().then(setAssets).catch(() => {})
   }, [])
 
+  // Portfolio is stale if any asset has never been aggregated or has staleAfter > 0
+  const isStale = useMemo(() =>
+    assets.some((a) => a.aggregatedThrough === null || a.staleAfter > 0),
+    [assets],
+  )
+
+  // Poll assets for staleness resolution
+  useEffect(() => {
+    if (!isStale) return
+    const interval = setInterval(async () => {
+      try {
+        const refreshed = await fetchAssets()
+        setAssets(refreshed)
+        if (!refreshed.some((a) => a.aggregatedThrough === null || a.staleAfter > 0)) {
+          loadData()
+        }
+      } catch {
+        // Silently ignore polling errors
+      }
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [isStale, loadData])
+
   const currentValue = data.length > 0 ? data[data.length - 1].totalValue : null
   const firstValue = data.length > 0 ? data[0].totalValue : null
   const change = currentValue !== null && firstValue !== null && firstValue !== 0
@@ -257,10 +280,39 @@ export default function HomePage({ displayCurrency }: HomePageProps) {
               ref={containerRef}
               onMouseMove={handleMouseMove}
               onMouseLeave={() => setTooltipIndex(null)}
-              sx={{ position: 'relative', cursor: 'crosshair' }}
+              sx={{ position: 'relative', cursor: isStale ? 'default' : 'crosshair' }}
             >
+              {/* Stale data overlay */}
+              {isStale && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    zIndex: 10,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(255, 255, 255, 0.85)',
+                    backdropFilter: 'blur(4px)',
+                    borderRadius: '8px',
+                    gap: 1.5,
+                  }}
+                >
+                  <CircularProgress
+                    size="md"
+                    sx={{ '--CircularProgress-trackColor': 'var(--joy-palette-primary-100)' }}
+                  />
+                  <Typography level="body-sm" sx={{ color: 'neutral.700', fontWeight: 600 }}>
+                    Recalculating…
+                  </Typography>
+                  <Typography level="body-xs" sx={{ color: 'neutral.500', textAlign: 'center', maxWidth: 260 }}>
+                    Portfolio data is being processed. The chart will update automatically.
+                  </Typography>
+                </Box>
+              )}
               {/* Crosshair */}
-              {tooltipIndex !== null && crosshairX !== null && (
+              {!isStale && tooltipIndex !== null && crosshairX !== null && (
                 <Box sx={{
                   position: 'absolute', top: 10, bottom: 30, left: crosshairX,
                   width: '1px', background: 'rgba(0,0,0,0.15)', pointerEvents: 'none', zIndex: 15,
@@ -268,7 +320,7 @@ export default function HomePage({ displayCurrency }: HomePageProps) {
               )}
 
               {/* Tooltip */}
-              {tooltipIndex !== null && data[tooltipIndex] && (() => {
+              {!isStale && tooltipIndex !== null && data[tooltipIndex] && (() => {
                 const point = data[tooltipIndex]
                 const containerWidth = containerRef.current?.getBoundingClientRect().width ?? 600
                 const tooltipWidth = 280

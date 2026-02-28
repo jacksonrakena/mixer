@@ -10,6 +10,7 @@ data class AssetDto(
     val ownerId: Uuid,
     val currency: String,
     val staleAfter: Long = 0,
+    val aggregatedThrough: String? = null,
     val provider: String = "USER",
     val providerData: String? = null,
 )

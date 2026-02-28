@@ -39,6 +39,7 @@ class AssetController(
                     ownerId = it[Asset.ownerId],
                     currency = it[Asset.currency],
                     staleAfter = it[Asset.staleAfter],
+                    aggregatedThrough = it[Asset.aggregatedThrough]?.toString(),
                     provider = it[Asset.provider],
                     providerData = it[Asset.providerData],
                 )

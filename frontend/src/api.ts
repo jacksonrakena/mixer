@@ -20,6 +20,7 @@ export interface AssetDto {
   ownerId: string;
   currency: string;
   staleAfter: number; // epoch millis, 0 = not stale
+  aggregatedThrough: string | null; // ISO date or null if never aggregated
 }
 
 export interface CreateAssetRequest {
@@ -271,6 +272,7 @@ export type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number];
 export interface AssetStalenessResponse {
   assetId: string;
   staleAfter: number; // epoch millis, 0 = not stale
+  aggregatedThrough: string | null; // ISO date or null if never aggregated
 }
 
 export async function fetchAssetStaleness(

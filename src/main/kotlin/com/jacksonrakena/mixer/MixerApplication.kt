@@ -13,6 +13,9 @@ import org.springframework.boot.runApplication
 import org.springframework.cache.annotation.EnableCaching
 import org.springframework.context.annotation.Bean
 import org.springframework.scheduling.annotation.EnableScheduling
+import javax.sql.DataSource
+
+
 
 
 @EnableCaching
@@ -36,8 +39,8 @@ class MixerApplication {
     }
 
     @Bean
-    fun database(): Database {
-        return Database.connect("jdbc:h2:mem:test", driver = "org.h2.Driver")
+    fun database(dataSource: DataSource): Database {
+        return Database.connect(dataSource)
     }
 }
 

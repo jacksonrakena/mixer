@@ -17,6 +17,7 @@ export default function AssetPage({ displayCurrency }: AssetPageProps) {
   const [asset, setAsset] = useState<AssetDto | null>(null)
   const [loading, setLoading] = useState(true)
   const [staleAfter, setStaleAfter] = useState(0)
+  const [aggregatedThrough, setAggregatedThrough] = useState<string | null>(null)
 
   useEffect(() => {
     if (!assetId) return
@@ -25,7 +26,10 @@ export default function AssetPage({ displayCurrency }: AssetPageProps) {
       .then((assets) => {
         const found = assets.find((a) => a.id === assetId) ?? null
         setAsset(found)
-        if (found) setStaleAfter(found.staleAfter)
+        if (found) {
+          setStaleAfter(found.staleAfter)
+          setAggregatedThrough(found.aggregatedThrough)
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -60,6 +64,7 @@ export default function AssetPage({ displayCurrency }: AssetPageProps) {
         assetName={asset.name}
         currency={asset.currency}
         staleAfter={staleAfter}
+        aggregatedThrough={aggregatedThrough}
         displayCurrency={displayCurrency}
       />
 

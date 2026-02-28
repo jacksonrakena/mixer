@@ -6,5 +6,6 @@ import kotlin.uuid.Uuid
 @Serializable
 data class AssetStalenessResponse(
     val assetId: Uuid,
-    val staleAfter: Long
+    val staleAfter: Long,
+    val aggregatedThrough: String? = null,
 )

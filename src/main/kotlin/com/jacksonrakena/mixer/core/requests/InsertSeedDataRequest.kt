@@ -7,9 +7,11 @@ import com.jacksonrakena.mixer.data.tables.concrete.User
 import com.jacksonrakena.mixer.data.tables.concrete.UserRole
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.batchInsert
 import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jobrunr.jobs.lambdas.JobRequest
 import org.jobrunr.jobs.lambdas.JobRequestHandler
@@ -73,6 +75,14 @@ class InsertSeedDataRequest: JobRequest {
             val time = Instant.parse("2026-02-16T23:05:37.337365Z")
             val userId = Uuid.parse("6c942179-c993-4b25-86dd-6346fb0e3005")
 
+            val existingUser = transaction {
+                User.selectAll().where { User.id eq userId }.firstOrNull()
+            }
+            if (existingUser != null) {
+                logger.info { "Seed user already exists, skipping seed data insertion" }
+                return
+            }
+
             val seedAssets = loadAssets()
             val seedTransactions = loadTransactions()
             val assetIdsByRef = seedAssets.associate { it.ref to Uuid.random() }
@@ -101,11 +111,13 @@ class InsertSeedDataRequest: JobRequest {
                     }
                 }
 
+                val rng = java.util.Random(42) // fixed seed for reproducible data
                 Transaction.batchInsert(seedTransactions) {
                     val assetId = assetIdsByRef[it.assetRef]
                         ?: throw IllegalStateException("Unknown asset ref in transactions.csv: ${it.assetRef}")
+                    val randomSecondsInDay = rng.nextInt(86400).toLong()
                     this[Transaction.assetId] = assetId
-                    this[Transaction.timestamp] = (time - it.daysAgo.days).toEpochMilliseconds()
+                    this[Transaction.timestamp] = (time - it.daysAgo.days).toEpochMilliseconds() + (randomSecondsInDay * 1000)
                     this[Transaction.type] = it.type
                     this[Transaction.amount] = it.amount
                     this[Transaction.value] = it.value
@@ -113,7 +125,7 @@ class InsertSeedDataRequest: JobRequest {
             }
 
             logger.info { "Finished seed data: ${seedAssets.size} assets, ${seedTransactions.size} transactions" }
-            jobRequestScheduler.enqueue(RecomputeUserAggregationRequest(userId))
+//            jobRequestScheduler.enqueue(RecomputeUserAggregationRequest(userId))
         }
     }
 }

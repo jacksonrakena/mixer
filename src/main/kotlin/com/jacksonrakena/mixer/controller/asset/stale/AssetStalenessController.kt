@@ -25,7 +25,8 @@ class AssetStalenessController {
 
         return AssetStalenessResponse(
             assetId = assetId,
-            staleAfter = asset[Asset.staleAfter]
+            staleAfter = asset[Asset.staleAfter],
+            aggregatedThrough = asset[Asset.aggregatedThrough]?.toString(),
         )
     }
 }

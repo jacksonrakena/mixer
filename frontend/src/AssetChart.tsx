@@ -401,6 +401,7 @@ interface AssetChartProps {
   assetName: string;
   currency: string;
   staleAfter: number; // epoch millis, 0 = not stale
+  aggregatedThrough: string | null; // ISO date or null if never aggregated
   displayCurrency?: string;
 }
 
@@ -485,6 +486,7 @@ export const AssetChart = ({
   assetName,
   currency,
   staleAfter: initialStaleAfter,
+  aggregatedThrough: initialAggregatedThrough,
   displayCurrency: displayCurrencyOverride,
 }: AssetChartProps) => {
   const [data, setData] = useState<AssetAggregation[]>([]);
@@ -492,6 +494,7 @@ export const AssetChart = ({
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<DateRange>("30d");
   const [staleAfter, setStaleAfter] = useState(initialStaleAfter);
+  const [aggregatedThrough, setAggregatedThrough] = useState(initialAggregatedThrough);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Tooltip tracking state
@@ -501,10 +504,13 @@ export const AssetChart = ({
     y: 0,
   });
 
-  // Keep staleAfter in sync when the prop changes (e.g. after a new transaction)
+  // Keep staleAfter/aggregatedThrough in sync when props change
   useEffect(() => {
     setStaleAfter(initialStaleAfter);
   }, [initialStaleAfter]);
+  useEffect(() => {
+    setAggregatedThrough(initialAggregatedThrough);
+  }, [initialAggregatedThrough]);
 
   // Compute the current chart date range (null for "all")
   const chartRange = useMemo(() => {
@@ -515,8 +521,9 @@ export const AssetChart = ({
     return { start, end };
   }, [range]);
 
-  // Determine if the chart's visible range includes the stale date
+  // Determine if the chart's visible range includes the stale date or aggregation hasn't run yet
   const isStale = useMemo(() => {
+    if (aggregatedThrough === null) return true;
     if (staleAfter === 0) return false;
     if (range === "all") return true; // "all" always includes the stale date
     const staleDate = new Date(staleAfter).toISOString().slice(0, 10);
@@ -525,7 +532,7 @@ export const AssetChart = ({
       staleDate >= chartRange.start &&
       staleDate <= chartRange.end
     );
-  }, [staleAfter, chartRange, range]);
+  }, [aggregatedThrough, staleAfter, chartRange, range]);
 
   // Fetch aggregation data
   const loadData = useCallback(() => {
@@ -576,12 +583,14 @@ export const AssetChart = ({
     const interval = setInterval(async () => {
       try {
         const res = await fetchAssetStaleness(assetId);
-        if (res.staleAfter === 0) {
+        if (res.staleAfter === 0 && res.aggregatedThrough !== null) {
           setStaleAfter(0);
+          setAggregatedThrough(res.aggregatedThrough);
           // Staleness cleared — refresh the chart data
           loadData();
         } else {
           setStaleAfter(res.staleAfter);
+          setAggregatedThrough(res.aggregatedThrough);
         }
       } catch {
         // Silently ignore polling errors
@@ -815,7 +824,7 @@ export const AssetChart = ({
             ref={containerRef}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
-            sx={{ position: "relative", cursor: "crosshair" }}
+            sx={{ position: "relative", cursor: isStale ? "default" : "crosshair" }}
           >
             {/* Stale data overlay */}
             {isStale && (
@@ -861,7 +870,7 @@ export const AssetChart = ({
             )}
 
             {/* Vertical crosshair line */}
-            {tooltipIndex !== null && crosshairX !== null && (
+            {!isStale && tooltipIndex !== null && crosshairX !== null && (
               <Box
                 sx={{
                   position: "absolute",
@@ -877,7 +886,7 @@ export const AssetChart = ({
             )}
 
             {/* Custom tooltip */}
-            {tooltipIndex !== null && data[tooltipIndex] && (
+            {!isStale && tooltipIndex !== null && data[tooltipIndex] && (
               <ChartTooltip
                 point={data[tooltipIndex]}
                 currency={currency}

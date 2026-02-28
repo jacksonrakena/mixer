@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.jacksonrakena.mixer.MixerApplication
 import com.jacksonrakena.mixer.MixerConfiguration
 import com.jacksonrakena.mixer.upstream.CurrencyRangeResponse
-import com.jacksonrakena.mixer.upstream.CurrencyResponse
 import com.jacksonrakena.mixer.upstream.CurrencyResponseMeta
 import com.jacksonrakena.mixer.upstream.CurrencyService
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -46,38 +45,9 @@ data class CandlestickValue(
 class OandaCurrencyService(val app: MixerApplication, val client: RestClient, val config: MixerConfiguration) :
     CurrencyService {
 
-    override fun getExchangeRate(base: String, pair: String): CurrencyResponse {
-        logger.info { "Fetching exchange rate for $base/$pair" }
-
-        val response = client
-            .get()
-            .uri("https://api-fxtrade.oanda.com/v3/instruments/${base}_$pair/candles")
-            .headers {
-                it.setBearerAuth(config.currency.token)
-            }
-            .retrieve()
-            .toEntity(OandaResponse::class.java)
-
-        if (!response.statusCode.is2xxSuccessful || response.body == null) {
-            throw Error("Could not get exchange rate for $base/$pair")
-        }
-
-        val rate = response.body!!.candles[0].mid.close
-        logger.info { "Established exchange rate for $base/$pair as $rate" }
-        return CurrencyResponse(
-            rate = rate,
-            meta = CurrencyResponseMeta(
-                generatedAt = Instant.now(),
-                generatedBy = "oanda",
-                dateOfRate = Instant.now()
-            )
-        )
-    }
-
-    override fun getHistoricExchangeRates(pair: Pair<String, String>): CurrencyRangeResponse {
+    override fun getHistoricExchangeRates(pair: Pair<String, String>, from: java.time.ZonedDateTime?): CurrencyRangeResponse {
         val end = Instant.now().atZone(ZoneId.systemDefault())
-        val start = end.minusDays(4950)
-        logger.info { "$pair: fetching rate history from $start to $end" }
+        val start = from ?: end.minusDays(4950)
         val response = client
             .get()
             .uri(
@@ -94,7 +64,6 @@ class OandaCurrencyService(val app: MixerApplication, val client: RestClient, va
             throw Error("Could not get exchange rate for ${pair.first}/${pair.second}")
         }
 
-//        logger.info { "$pair: retrieved ${response.body!!.candles.size} days of rate history" }
         return CurrencyRangeResponse(
             meta = CurrencyResponseMeta(
                 generatedBy = "oanda-range",
