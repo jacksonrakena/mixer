@@ -12,6 +12,11 @@ A self-hosted portfolio tracking application for managing financial assets, tran
 - **Market data** — Automatic price fetching for market-traded assets via Yahoo Finance
 - **Seed data** — Optional realistic demo portfolio loaded from CSV files
 
+## Screenshots
+![img.png](readme/home.png)
+
+![img.png](readme/asset.png)
+
 ## Quick Start
 
 ### Prerequisites
