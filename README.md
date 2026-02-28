@@ -56,7 +56,7 @@ Configuration is split across two files:
 - **`application.properties`** — Committed defaults, safe for public repos
 - **`application-local.properties`** — Local/secret overrides, gitignored (copy from `.example`)
 
-For production, configure via environment variables (Spring Boot binds `MIXER_CURRENCY_TOKEN` → `mixer.currency.token`, etc.):
+For production, configure via environment variables:
 
 | Property | Default | Description |
 |----------|---------|-------------|
