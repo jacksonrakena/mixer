@@ -4,6 +4,7 @@ import com.jacksonrakena.mixer.MixerConfiguration
 import com.jacksonrakena.mixer.core.requests.RecomputeUserAggregationRequest
 import com.jacksonrakena.mixer.data.tables.concrete.User
 import com.jacksonrakena.mixer.data.tables.concrete.UserRole
+import com.jacksonrakena.mixer.security.MixerUserDetails
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -15,8 +16,9 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import org.jobrunr.scheduling.JobRequestScheduler
 import org.springframework.http.HttpStatus
+import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
-import org.springframework.security.core.authority.SimpleGrantedAuthority
+import org.springframework.security.core.AuthenticationException
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository
@@ -68,6 +70,7 @@ data class ChangePasswordRequest(
 @RequestMapping("/auth")
 class AuthController(
     private val passwordEncoder: PasswordEncoder,
+    private val authenticationManager: AuthenticationManager,
     private val jobRequestScheduler: JobRequestScheduler,
     private val mixerConfiguration: MixerConfiguration,
 ) {
@@ -114,8 +117,8 @@ class AuthController(
         logger.info { "New user signup: ${request.email} (id=$userId)" }
         logger.info { "Email verification link: /auth/verify?token=$verificationToken" }
 
-        val roles = emptyList<String>()
-        setAuthentication(userId, roles, httpRequest, httpResponse)
+        val auth = authenticateAndSaveSession(request.email, request.password, httpRequest, httpResponse)
+        val userDetails = auth.principal as MixerUserDetails
 
         // Read back the created user to return actual defaults from the DB schema
         val user = transaction {
@@ -129,7 +132,7 @@ class AuthController(
             emailVerified = user[User.emailVerified],
             timezone = user[User.timezone],
             displayCurrency = user[User.displayCurrency],
-            roles = roles,
+            roles = userDetails.authorities.mapNotNull { it.authority?.removePrefix("ROLE_") },
             createdAt = user[User.createdAt],
         )
     }
@@ -140,29 +143,28 @@ class AuthController(
         httpRequest: HttpServletRequest,
         httpResponse: HttpServletResponse,
     ): UserResponse {
-        val user = transaction {
-            User.selectAll().where { User.email eq request.email.lowercase().trim() }.firstOrNull()
-        } ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials")
-
-        if (!passwordEncoder.matches(request.password, user[User.passwordHash])) {
+        val auth = try {
+            authenticateAndSaveSession(request.email, request.password, httpRequest, httpResponse)
+        } catch (e: AuthenticationException) {
             throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials")
         }
 
-        val roles = transaction {
-            UserRole.selectAll().where { UserRole.userId eq user[User.id] }.map { it[UserRole.role] }
+        val userDetails = auth.principal as MixerUserDetails
+        val userId = Uuid.parse(userDetails.userId)
+        logger.info { "User logged in: ${request.email}" }
+
+        val user = transaction {
+            User.selectAll().where { User.id eq userId }.first()
         }
 
-        setAuthentication(user[User.id], roles, httpRequest, httpResponse)
-        logger.info { "User logged in: ${user[User.email]}" }
-
         return UserResponse(
-            id = user[User.id],
+            id = userId,
             email = user[User.email],
             displayName = user[User.displayName],
             emailVerified = user[User.emailVerified],
             timezone = user[User.timezone],
             displayCurrency = user[User.displayCurrency],
-            roles = roles,
+            roles = userDetails.authorities.mapNotNull { it.authority?.removePrefix("ROLE_") },
             createdAt = user[User.createdAt],
         )
     }
@@ -263,25 +265,29 @@ class AuthController(
         return mapOf("status" to "ok")
     }
 
-    private fun setAuthentication(
-        userId: Uuid,
-        roles: List<String>,
+    private fun authenticateAndSaveSession(
+        email: String,
+        password: String,
         request: HttpServletRequest,
         response: HttpServletResponse,
-    ) {
-        val authorities = roles.map { SimpleGrantedAuthority("ROLE_$it") }
-        val auth = UsernamePasswordAuthenticationToken(userId.toString(), null, authorities)
+    ): org.springframework.security.core.Authentication {
+        val auth = authenticationManager.authenticate(
+            UsernamePasswordAuthenticationToken(email.lowercase().trim(), password)
+        )
         val context = SecurityContextHolder.createEmptyContext()
         context.authentication = auth
         SecurityContextHolder.setContext(context)
         securityContextRepository.saveContext(context, request, response)
+        return auth
     }
 
     companion object {
         fun currentUserId(): Uuid {
             val auth = SecurityContextHolder.getContext().authentication
                 ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Not authenticated")
-            return Uuid.parse(auth.name)
+            val principal = auth.principal as? MixerUserDetails
+                ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid authentication")
+            return Uuid.parse(principal.userId)
         }
     }
 }

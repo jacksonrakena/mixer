@@ -84,6 +84,7 @@ jobs:
           context: .
           file: Containerfile
           push: true
+          provenance: false
           tags: ${{ steps.backend-meta.outputs.tags }}
           labels: ${{ steps.backend-meta.outputs.labels }}
 
@@ -103,5 +104,6 @@ jobs:
           context: frontend
           file: frontend/Containerfile
           push: true
+          provenance: false
           tags: ${{ steps.frontend-meta.outputs.tags }}
           labels: ${{ steps.frontend-meta.outputs.labels }}
