@@ -4,15 +4,13 @@ import Sheet from '@mui/joy/Sheet'
 import Typography from '@mui/joy/Typography'
 import Input from '@mui/joy/Input'
 import Button from '@mui/joy/Button'
-import Autocomplete from '@mui/joy/Autocomplete'
 import Alert from '@mui/joy/Alert'
 import Chip from '@mui/joy/Chip'
 import Divider from '@mui/joy/Divider'
 import { useAuth } from '../AuthContext'
 import { updateProfile, changePassword, fetchConfig, type SupportedCurrency } from '../api'
 import CurrencySelect from '../components/CurrencySelect'
-
-const TIMEZONES: string[] = Intl.supportedValuesOf('timeZone')
+import TimezoneSelect from '../components/TimezoneSelect'
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth()
@@ -152,14 +150,9 @@ export default function ProfilePage() {
               <Typography level="body-sm" sx={{ color: 'neutral.400', mb: 0.5 }}>
                 Timezone
               </Typography>
-              <Autocomplete
-                value={timezone}
-                onChange={(_, val) => val && setTimezone(val)}
-                options={TIMEZONES}
-                placeholder="Select timezone…"
-                size="sm"
-                sx={{ mb: 2 }}
-              />
+              <Box sx={{ mb: 2 }}>
+                <TimezoneSelect value={timezone} onChange={setTimezone} />
+              </Box>
 
               <Typography level="body-sm" sx={{ color: 'neutral.400', mb: 0.5 }}>
                 Default Display Currency
