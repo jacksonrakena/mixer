@@ -3,35 +3,18 @@ package com.jacksonrakena.mixer.security
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.core.io.ClassPathResource
 import org.springframework.http.HttpMethod
-import org.springframework.jdbc.datasource.init.DataSourceInitializer
-import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
-import org.springframework.session.jdbc.config.annotation.web.http.EnableJdbcHttpSession
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
-import javax.sql.DataSource
 
 @Configuration
 @EnableWebSecurity
-@EnableJdbcHttpSession
 class SecurityConfig {
-
-    @Bean
-    fun springSessionDataSourceInitializer(dataSource: DataSource): DataSourceInitializer {
-        val initializer = DataSourceInitializer()
-        initializer.setDataSource(dataSource)
-        val populator = ResourceDatabasePopulator()
-        populator.addScript(ClassPathResource("org/springframework/session/jdbc/schema-h2.sql"))
-        populator.setContinueOnError(true)
-        initializer.setDatabasePopulator(populator)
-        return initializer
-    }
 
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {

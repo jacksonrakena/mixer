@@ -7,7 +7,7 @@ import org.jetbrains.exposed.v1.datetime.date
 
 object AssetAggregate: Table("generated_asset_aggregate") {
     val assetId = uuid("asset_id").references(Asset.id)
-    val aggregationPeriod = enumeration("aggregation_period", AggregationPeriod::class)
+    val aggregationPeriod = enumerationByName("aggregation_period", 10, AggregationPeriod::class)
     val totalValue = double("total_value")
     val holding = double("holding").default(0.0)
     // The end date of the period this aggregate represents

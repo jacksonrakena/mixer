@@ -9,7 +9,7 @@ object Transaction: Table("translog") {
     val id = uuid("id").autoGenerate()
     val timestamp = long("timestamp").clientDefault { System.currentTimeMillis() }
     val assetId = uuid("asset_id").references(Asset.id)
-    val type = enumeration("transaction_type", AssetTransactionType::class)
+    val type = enumerationByName("transaction_type", 20, AssetTransactionType::class)
 
     val amount = double("amount").nullable()
     val value = double("value").nullable()

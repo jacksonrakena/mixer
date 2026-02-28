@@ -1,0 +1,355 @@
+databaseChangeLog:
+  - changeSet:
+      id: 1-create-tables
+      author: mixer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: users
+      changes:
+        - createTable:
+            tableName: users
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: email
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: password_hash
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: display_name
+                  type: VARCHAR(255)
+                  defaultValue: ""
+                  constraints:
+                    nullable: false
+              - column:
+                  name: email_verified
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: email_verification_token
+                  type: VARCHAR(255)
+              - column:
+                  name: tz
+                  type: VARCHAR(255)
+                  defaultValue: "Australia/Sydney"
+                  constraints:
+                    nullable: false
+              - column:
+                  name: display_currency
+                  type: VARCHAR(10)
+                  defaultValue: "AUD"
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+
+        - createIndex:
+            tableName: users
+            indexName: users_email_unique
+            unique: true
+            columns:
+              - column:
+                  name: email
+
+        - createTable:
+            tableName: user_roles
+            columns:
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_user_roles_user
+                    references: users(id)
+              - column:
+                  name: role
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: user_roles
+            columnNames: user_id, role
+            constraintName: pk_user_roles
+
+        - createTable:
+            tableName: assets
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: owner_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_assets_user
+                    references: users(id)
+              - column:
+                  name: currency_code
+                  type: VARCHAR(10)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: provider
+                  type: VARCHAR(20)
+                  defaultValue: "USER"
+                  constraints:
+                    nullable: false
+              - column:
+                  name: provider_data
+                  type: TEXT
+              - column:
+                  name: stale_after
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: aggregated_through
+                  type: DATE
+
+        - createTable:
+            tableName: translog
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: timestamp
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: asset_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_translog_asset
+                    references: assets(id)
+              - column:
+                  name: transaction_type
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: amount
+                  type: DOUBLE
+              - column:
+                  name: value
+                  type: DOUBLE
+
+        - createTable:
+            tableName: exchange_rates
+            columns:
+              - column:
+                  name: reference_date
+                  type: DATE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: base
+                  type: VARCHAR(4)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: counter
+                  type: VARCHAR(4)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: rate
+                  type: DOUBLE
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: exchange_rates
+            columnNames: reference_date, base, counter
+            constraintName: pk_exchange_rates
+
+        - createTable:
+            tableName: generated_asset_aggregate
+            columns:
+              - column:
+                  name: asset_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_agg_asset
+                    references: assets(id)
+              - column:
+                  name: aggregation_period
+                  type: VARCHAR(10)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: period_end_date
+                  type: DATE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: total_value
+                  type: DOUBLE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: holding
+                  type: DOUBLE
+                  defaultValueNumeric: 0.0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: delta_reconciliation
+                  type: DOUBLE
+                  defaultValueNumeric: 0.0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: delta_trades
+                  type: DOUBLE
+                  defaultValueNumeric: 0.0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: delta_other
+                  type: DOUBLE
+                  defaultValueNumeric: 0.0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: unit_price
+                  type: DOUBLE
+              - column:
+                  name: value_date
+                  type: DATE
+        - addPrimaryKey:
+            tableName: generated_asset_aggregate
+            columnNames: asset_id, aggregation_period, period_end_date
+            constraintName: pk_generated_asset_aggregate
+
+  - changeSet:
+      id: 2-spring-session
+      author: mixer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: SPRING_SESSION
+      changes:
+        - createTable:
+            tableName: SPRING_SESSION
+            columns:
+              - column:
+                  name: PRIMARY_ID
+                  type: CHAR(36)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: SESSION_ID
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: CREATION_TIME
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: LAST_ACCESS_TIME
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: MAX_INACTIVE_INTERVAL
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: EXPIRY_TIME
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: PRINCIPAL_NAME
+                  type: VARCHAR(100)
+
+        - createIndex:
+            tableName: SPRING_SESSION
+            indexName: SPRING_SESSION_IX1
+            unique: true
+            columns:
+              - column:
+                  name: SESSION_ID
+
+        - createIndex:
+            tableName: SPRING_SESSION
+            indexName: SPRING_SESSION_IX2
+            columns:
+              - column:
+                  name: EXPIRY_TIME
+
+        - createIndex:
+            tableName: SPRING_SESSION
+            indexName: SPRING_SESSION_IX3
+            columns:
+              - column:
+                  name: PRINCIPAL_NAME
+
+        - createTable:
+            tableName: SPRING_SESSION_ATTRIBUTES
+            columns:
+              - column:
+                  name: SESSION_PRIMARY_ID
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+                    foreignKeyName: SPRING_SESSION_ATTRIBUTES_FK
+                    references: SPRING_SESSION(PRIMARY_ID)
+                    deleteCascade: true
+              - column:
+                  name: ATTRIBUTE_NAME
+                  type: VARCHAR(200)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ATTRIBUTE_BYTES
+                  type: BLOB
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: SPRING_SESSION_ATTRIBUTES
+            columnNames: SESSION_PRIMARY_ID, ATTRIBUTE_NAME
+            constraintName: pk_spring_session_attributes

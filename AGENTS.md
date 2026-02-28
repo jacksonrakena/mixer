@@ -6,9 +6,10 @@ Mixer is a portfolio tracking application for managing financial assets, transac
 
 - **Backend**: Kotlin 2.2 + Spring Boot 4 + Exposed ORM + JobRunr (async jobs)
 - **Frontend**: React 19 + TypeScript 5.9 + MUI Joy UI + Vite 8 + MUI X Charts
-- **Database**: H2 file-based (`jdbc:h2:file:./data/mixer`) for development, PostgreSQL (latest) for production. Exposed auto-DDL, data persists across restarts
+- **Database**: H2 file-based (`jdbc:h2:file:./data/mixer`) for development, PostgreSQL (latest) for production. Data persists across restarts
+- **Schema management**: Liquibase (`spring-boot-liquibase` + `liquibase-core`). Changelog at `src/main/resources/db/changelog/db.changelog-master.yaml`. Exposed auto-DDL is disabled (`spring.exposed.generate-ddl=false`). Changesets have `preConditions: onFail: MARK_RAN` so they skip gracefully on existing databases.
 - **DB Compatibility**: Only use SQL features supported by both H2 and PostgreSQL. Notably: no `INSERT IGNORE` (H2 requires MySQL mode), use `upsert` (Exposed's `MERGE`/`ON CONFLICT`) instead. No H2-specific SQL syntax.
-- **Sessions**: Spring Session JDBC (`@EnableJdbcHttpSession` in `SecurityConfig`), schema auto-created via `DataSourceInitializer` bean
+- **Sessions**: Spring Session JDBC (`@EnableJdbcHttpSession` in `SecurityConfig`), schema managed by Liquibase (changeset `2-spring-session`)
 - **Build**: Gradle (Kotlin DSL), Java 21 target
 - **Frontend build**: Yarn, `npx tsc --noEmit` for type checking
 - **CI**: GitHub Actions → test + build Docker image → push to GHCR
@@ -86,6 +87,8 @@ frontend/src/
 
 src/main/resources/
 ├── application.properties  # Spring config
+├── db/changelog/
+│   └── db.changelog-master.yaml  # Liquibase schema changelog
 └── seed/
     ├── assets.csv          # 7 seed assets (AAPL, MSFT, VOO, TSLA, AMZN, NVDA, TEAM)
     └── transactions.csv    # ~193 seed transactions
@@ -280,7 +283,8 @@ This is the most complex subsystem. Key concepts:
 2. **nativeValue fallback is 0.0** — If no unit price is available, value is 0 (not the holding amount).
 3. **Timezone read once, passed through** — Avoids repeated DB queries during aggregation.
 4. **Session-based auth** — Uses Spring Security sessions, not JWT. Sessions persist across restarts via Spring Session JDBC.
-5. **Aggregation range queries use `>=` and `<=`** — Inclusive bounds to include today's data point.
+5. **Schema managed by Liquibase** — All tables (app + session) defined in YAML changelog. Exposed auto-DDL disabled. Changesets use `preConditions` to skip on existing databases.
+6. **Aggregation range queries use `>=` and `<=`** — Inclusive bounds to include today's data point.
 6. **fillDateRange carries forward correctly** — Tracks `lastAmount` (holding) separately from `lastNativeValue` (monetary value).
 7. **Shared DataSource** — Exposed ORM and Spring Session JDBC share the same `DataSource` bean (not separate connections).
 8. **Incremental FX backfill** — Only fetches new rates since the latest existing record per currency pair.
@@ -293,5 +297,6 @@ This is the most complex subsystem. Key concepts:
 - `Asset innerJoin User` works because `Asset.ownerId` has `.references(User.id)` — it's an Exposed infix function.
 - When adding new currencies, update `mixer.fx.currencies` in `application.properties` and `CURRENCY_NAMES` in `App.tsx`.
 - The `Database.connect()` bean in `MixerApplication.kt` must use the injected `DataSource`, not a hardcoded URL — otherwise Exposed and Spring Session use different databases.
-- Spring Boot 4 removed session auto-configuration — `@EnableJdbcHttpSession` is required, plus a `DataSourceInitializer` bean to create the schema tables.
+- Spring Boot 4 removed session auto-configuration — `@EnableJdbcHttpSession` is required, and session tables are managed by Liquibase (changeset `2-spring-session`).
+- Spring Boot 4 modularized autoconfiguration — Liquibase requires both `spring-boot-liquibase` (autoconfigure module) AND `liquibase-core`. Just `liquibase-core` alone won't trigger autoconfiguration.
 - `RecurringTaskScheduler` initial delays prevent race conditions with Exposed DDL creation on startup.
