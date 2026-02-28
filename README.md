@@ -72,21 +72,28 @@ For production, configure via environment variables:
 
 ### Docker
 
-```bash
-# Build
-./gradlew bootJar
-docker build -f Containerfile -t ghcr.io/jacksonrakena/mixer:latest .
+Two images are published to GHCR on every push to `main`:
 
-# Run
+| Image | Port | Description |
+|-------|------|-------------|
+| `ghcr.io/jacksonrakena/mixer` | 8080 | Backend API (Spring Boot) |
+| `ghcr.io/jacksonrakena/mixer-frontend` | 3000 | Frontend (static file server) |
+
+```bash
+# Backend
 docker run -p 8080:8080 \
   -e SPRING_DATASOURCE_URL=jdbc:h2:file:./data/mixer \
   -e MIXER_CURRENCY_PROVIDER=oanda \
   -e MIXER_CURRENCY_TOKEN=your-token \
   -v mixer-data:/application/data \
   ghcr.io/jacksonrakena/mixer:latest
+
+# Frontend
+docker run -p 3000:3000 \
+  ghcr.io/jacksonrakena/mixer-frontend:latest
 ```
 
-A pre-built image is published to GHCR on every push to `main`.
+Route `/api/*` from the frontend to the backend using your deployment infrastructure (reverse proxy, ingress, etc.).
 
 ## Build & Test
 
