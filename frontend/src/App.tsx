@@ -3,8 +3,6 @@ import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import Box from '@mui/joy/Box'
 import Typography from '@mui/joy/Typography'
 import Divider from '@mui/joy/Divider'
-import Select from '@mui/joy/Select'
-import Option from '@mui/joy/Option'
 import IconButton from '@mui/joy/IconButton'
 import Menu from '@mui/joy/Menu'
 import MenuItem from '@mui/joy/MenuItem'
@@ -14,15 +12,7 @@ import CircularProgress from '@mui/joy/CircularProgress'
 import { fetchAssets, fetchConfig, type AssetDto, type SupportedCurrency } from './api'
 import { CreateAssetModal } from './AssetList'
 import { useAuth } from './AuthContext'
-
-const CURRENCY_NAMES: Record<string, string> = {
-  AUD: 'Australian Dollar',
-  USD: 'US Dollar',
-  NZD: 'New Zealand Dollar',
-  EUR: 'Euro',
-  GBP: 'British Pound',
-  HKD: 'Hong Kong Dollar',
-}
+import CurrencySelect from './components/CurrencySelect'
 
 const SIDEBAR_WIDTH = 260
 const SIDEBAR_COLLAPSED_WIDTH = 56
@@ -190,40 +180,11 @@ export default function App() {
                 Display Currency
               </Typography>
               <Box sx={{ px: 2 }}>
-                <Select
+                <CurrencySelect
                   value={displayCurrency}
-                  onChange={(_, val) => val && setDisplayCurrency(val as SupportedCurrency)}
-                  size="sm"
-                  renderValue={(selected) => selected ? (
-                    <Box sx={{ textAlign: 'left' }}>
-                      <Typography level="body-sm" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
-                        {selected.value}
-                      </Typography>
-                      <Typography level="body-xs" sx={{ color: 'neutral.500', lineHeight: 1.2 }}>
-                        {CURRENCY_NAMES[selected.value as string] ?? ''}
-                      </Typography>
-                    </Box>
-                  ) : null}
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: '13px',
-                    borderRadius: '8px',
-                    py: 0.75,
-                    textAlign: 'left',
-                    '& .MuiSelect-button': { textAlign: 'left' },
-                  }}
-                >
-                  {currencies.map((cur) => (
-                    <Option key={cur} value={cur}>
-                      <Box>
-                        <Typography level="body-sm" sx={{ fontWeight: 600 }}>{cur}</Typography>
-                        <Typography level="body-xs" sx={{ color: 'neutral.500' }}>
-                          {CURRENCY_NAMES[cur] ?? cur}
-                        </Typography>
-                      </Box>
-                    </Option>
-                  ))}
-                </Select>
+                  onChange={setDisplayCurrency}
+                  currencies={currencies}
+                />
               </Box>
             </>
           )}

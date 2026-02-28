@@ -382,6 +382,25 @@ export async function updateProfile(req: {
   return res.json();
 }
 
+export async function changePassword(req: {
+  currentPassword: string;
+  newPassword: string;
+}): Promise<void> {
+  const res = await fetch(`${BASE}/auth/password`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    if (res.status === 401) throw new Error("Current password is incorrect");
+    if (res.status === 400) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || "Invalid password");
+    }
+    throw new Error(`Failed to change password: ${res.status}`);
+  }
+}
+
 // ── Admin ─────────────────────────────────────────────────────────────────────
 
 export async function fetchAdminUsers(): Promise<UserResponse[]> {

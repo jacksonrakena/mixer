@@ -57,6 +57,12 @@ data class UpdateProfileRequest(
     val displayCurrency: String? = null,
 )
 
+@Serializable
+data class ChangePasswordRequest(
+    val currentPassword: String,
+    val newPassword: String,
+)
+
 @RestController
 @RequestMapping("/auth")
 class AuthController(
@@ -225,6 +231,31 @@ class AuthController(
         }
 
         return me()
+    }
+
+    @PutMapping("/password")
+    fun changePassword(@RequestBody request: ChangePasswordRequest): Map<String, String> {
+        if (request.newPassword.length < 8) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "New password must be at least 8 characters")
+        }
+
+        val userId = currentUserId()
+        val user = transaction {
+            User.selectAll().where { User.id eq userId }.firstOrNull()
+        } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "User not found")
+
+        if (!passwordEncoder.matches(request.currentPassword, user[User.passwordHash])) {
+            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Current password is incorrect")
+        }
+
+        transaction {
+            User.update({ User.id eq userId }) {
+                it[passwordHash] = passwordEncoder.encode(request.newPassword)!!
+            }
+        }
+
+        logger.info { "Password changed for user $userId" }
+        return mapOf("status" to "ok")
     }
 
     private fun setAuthentication(
