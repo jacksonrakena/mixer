@@ -1,4 +1,4 @@
-import { useState, useMemo, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import Box from '@mui/joy/Box'
 import Sheet from '@mui/joy/Sheet'
 import Typography from '@mui/joy/Typography'
@@ -11,7 +11,7 @@ import Alert from '@mui/joy/Alert'
 import Chip from '@mui/joy/Chip'
 import Divider from '@mui/joy/Divider'
 import { useAuth } from '../AuthContext'
-import { updateProfile, SUPPORTED_CURRENCIES, type SupportedCurrency } from '../api'
+import { updateProfile, fetchConfig, type SupportedCurrency } from '../api'
 
 const TIMEZONES: string[] = Intl.supportedValuesOf('timeZone')
 
@@ -25,6 +25,11 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  const [currencies, setCurrencies] = useState<string[]>([])
+
+  useEffect(() => {
+    fetchConfig().then((cfg) => setCurrencies(cfg.currencies)).catch(console.error)
+  }, [])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -144,7 +149,7 @@ export default function ProfilePage() {
             size="sm"
             sx={{ mb: 3 }}
           >
-            {SUPPORTED_CURRENCIES.map((cur) => (
+            {currencies.map((cur) => (
               <Option key={cur} value={cur}>
                 {cur}
               </Option>

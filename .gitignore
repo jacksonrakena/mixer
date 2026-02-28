@@ -36,8 +36,14 @@ out/
 ### VS Code ###
 .vscode/
 
+### macOS ###
+.DS_Store
+
 ### H2 Database ###
 /data/
+
+### Local config ###
+src/main/resources/application-local.properties
 
 ### Kotlin ###
 .kotlin

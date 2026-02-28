@@ -11,7 +11,7 @@ import MenuItem from '@mui/joy/MenuItem'
 import MenuButton from '@mui/joy/MenuButton'
 import Dropdown from '@mui/joy/Dropdown'
 import CircularProgress from '@mui/joy/CircularProgress'
-import { fetchAssets, SUPPORTED_CURRENCIES, type AssetDto, type SupportedCurrency } from './api'
+import { fetchAssets, fetchConfig, type AssetDto, type SupportedCurrency } from './api'
 import { CreateAssetModal } from './AssetList'
 import { useAuth } from './AuthContext'
 
@@ -38,12 +38,16 @@ export default function App() {
   )
   const [collapsed, setCollapsed] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [currencies, setCurrencies] = useState<string[]>([])
 
   useEffect(() => {
     fetchAssets()
       .then(setAssets)
       .catch(console.error)
       .finally(() => setLoadingAssets(false))
+    fetchConfig()
+      .then((cfg) => setCurrencies(cfg.currencies))
+      .catch(console.error)
   }, [])
 
   const currentAssetId = location.pathname.startsWith('/asset/') ? location.pathname.split('/')[2] : null
@@ -209,7 +213,7 @@ export default function App() {
                     '& .MuiSelect-button': { textAlign: 'left' },
                   }}
                 >
-                  {SUPPORTED_CURRENCIES.map((cur) => (
+                  {currencies.map((cur) => (
                     <Option key={cur} value={cur}>
                       <Box>
                         <Typography level="body-sm" sx={{ fontWeight: 600 }}>{cur}</Typography>

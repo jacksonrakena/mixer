@@ -9,13 +9,14 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.Database
-import org.jetbrains.exposed.v1.jdbc.upsert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.upsert
 import org.jobrunr.jobs.lambdas.JobRequest
 import org.jobrunr.jobs.lambdas.JobRequestHandler
 import org.slf4j.MDC
 import org.springframework.stereotype.Component
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
@@ -53,7 +54,13 @@ data class BackfillCurrencyPairRequest(val base: String, val counter: String): J
 
                 val fetchFrom: ZonedDateTime? = if (latestExisting != null) {
                     val javaDate = LocalDate.of(latestExisting.year, latestExisting.monthNumber, latestExisting.dayOfMonth)
-                    if (!javaDate.isBefore(LocalDate.now(ZoneOffset.UTC))) {
+                    val today = LocalDate.now(ZoneOffset.UTC)
+                    // Find the most recent trading day (last weekday, since forex markets
+                    // are closed on weekends). If the latest rate is on or after that day,
+                    // there's nothing new to fetch.
+                    val lastTradingDay = generateSequence(today) { it.minusDays(1) }
+                        .first { it.dayOfWeek != DayOfWeek.SATURDAY && it.dayOfWeek != DayOfWeek.SUNDAY }
+                    if (!javaDate.isBefore(lastTradingDay)) {
                         logger.info { "${request.base}/${request.counter} is up to date (latest: $latestExisting)" }
                         return
                     }
@@ -67,10 +74,14 @@ data class BackfillCurrencyPairRequest(val base: String, val counter: String): J
                 val inserted = transaction {
                     var count = 0
                     for (entry in rate.rates) {
+                        // Oanda daily candles start at 5 PM ET (typically 22:00 or 21:00 UTC),
+                        // which falls on the previous calendar day in UTC.
+                        // Add 1 day to get the actual trading day the candle represents.
+                        val tradingDay = entry.key.atOffset(ZoneOffset.UTC).toLocalDate().plusDays(1).toKotlinLocalDate()
                         ExchangeRate.upsert {
                             it[base] = request.base
                             it[counter] = request.counter
-                            it[referenceDate] = entry.key.atOffset(ZoneOffset.UTC).toLocalDate().toKotlinLocalDate()
+                            it[referenceDate] = tradingDay
                             it[ExchangeRate.rate] = entry.value ?: 0.0
                         }
                         count++

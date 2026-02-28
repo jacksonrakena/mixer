@@ -16,7 +16,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 @ConfigurationProperties(prefix = "mixer")
 @ConfigurationPropertiesScan
 data class MixerConfiguration(
-    val currency: CurrencyConfiguration
+    val currency: CurrencyConfiguration,
+    val refresh: RefreshConfiguration = RefreshConfiguration(),
+    val fx: FxConfiguration = FxConfiguration(),
+    val data: DataConfiguration = DataConfiguration(),
 ) {
     @Bean
     fun restClient(): RestClient = RestClient.create()
@@ -24,8 +27,30 @@ data class MixerConfiguration(
 
 @ConfigurationPropertiesScan
 data class CurrencyConfiguration(
-    val provider: String,
-    val token: String
+    val provider: String = "",
+    val token: String = ""
+)
+
+data class RefreshConfiguration(
+    val aggregations: ScheduleConfiguration = ScheduleConfiguration(initial = 10000, interval = 300000),
+    val fx: ScheduleConfiguration = ScheduleConfiguration(initial = 10000, interval = 300000),
+)
+
+data class ScheduleConfiguration(
+    val initial: Long = 10000,
+    val interval: Long = 300000,
+)
+
+data class FxConfiguration(
+    val currencies: List<String> = listOf("EUR", "GBP", "AUD", "NZD", "USD", "HKD"),
+)
+
+data class DataConfiguration(
+    val seed: SeedConfiguration = SeedConfiguration(),
+)
+
+data class SeedConfiguration(
+    val insert: Boolean = true,
 )
 @Configuration
 class SerializationConfiguration {

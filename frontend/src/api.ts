@@ -257,6 +257,20 @@ export async function fetchAllPortfolioAggregation(
 
 // ── Supported currencies ─────────────────────────────────────────────────────
 
+export interface ClientConfig {
+  currencies: string[];
+}
+
+let _configCache: ClientConfig | null = null;
+
+export async function fetchConfig(): Promise<ClientConfig> {
+  if (_configCache) return _configCache;
+  const res = await fetch(`${BASE}/config`, { credentials: "include" });
+  if (!res.ok) throw new Error("Failed to fetch config");
+  _configCache = await res.json();
+  return _configCache!;
+}
+
 export const SUPPORTED_CURRENCIES = [
   "AUD",
   "USD",

@@ -1,5 +1,6 @@
 package com.jacksonrakena.mixer.core.bootstrap
 
+import com.jacksonrakena.mixer.MixerConfiguration
 import com.jacksonrakena.mixer.core.requests.BackfillCurrencyPairRequest
 import com.jacksonrakena.mixer.data.UserAggregationManager
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -14,21 +15,23 @@ private val logger = KotlinLogging.logger {}
 class RecurringTaskScheduler(
     private val userAggregationManager: UserAggregationManager,
     private val jobRequestScheduler: JobRequestScheduler,
+    private val config: MixerConfiguration,
 ) {
     companion object {
-        private val SUPPORTED_CURRENCIES = listOf("EUR", "GBP", "AUD", "NZD", "USD", "HKD")
-
-        val SUPPORTED_PAIRS by lazy {
-            SUPPORTED_CURRENCIES.mapIndexed { index, currency ->
-                if (index == SUPPORTED_CURRENCIES.lastIndex) return@mapIndexed listOf()
-                SUPPORTED_CURRENCIES
-                    .subList(index + 1, SUPPORTED_CURRENCIES.lastIndex + 1)
+        fun currencyPairs(currencies: List<String>): List<Pair<String, String>> {
+            return currencies.mapIndexed { index, currency ->
+                if (index == currencies.lastIndex) return@mapIndexed listOf()
+                currencies
+                    .subList(index + 1, currencies.lastIndex + 1)
                     .map { target -> Pair(currency, target) }
             }.flatten()
         }
     }
 
-    @Scheduled(initialDelay = 10_000, fixedRate = 300_000) // first run after 10s, then every 5 minutes
+    @Scheduled(
+        initialDelayString = "\${mixer.refresh.aggregations.initial:10000}",
+        fixedRateString = "\${mixer.refresh.aggregations.interval:300000}"
+    )
     fun refreshAggregations() {
         logger.debug { "Running scheduled aggregation refresh" }
         runBlocking {
@@ -36,10 +39,14 @@ class RecurringTaskScheduler(
         }
     }
 
-    @Scheduled(initialDelay = 10_000, fixedRate = 300_000) // on startup, then daily
+    @Scheduled(
+        initialDelayString = "\${mixer.refresh.fx.initial:10000}",
+        fixedRateString = "\${mixer.refresh.fx.interval:300000}"
+    )
     fun refreshCurrencyRates() {
-        logger.info { "Scheduling currency backfill jobs" }
-        for (pair in SUPPORTED_PAIRS) {
+        val pairs = currencyPairs(config.fx.currencies)
+        logger.info { "Scheduling currency backfill jobs for ${pairs.size} pairs" }
+        for (pair in pairs) {
             jobRequestScheduler.enqueue(
                 BackfillCurrencyPairRequest(base = pair.first, counter = pair.second)
             )

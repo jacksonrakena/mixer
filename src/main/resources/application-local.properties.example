@@ -1,0 +1,14 @@
+# Local development overrides
+# Copy this file to application-local.properties and fill in your values.
+# application-local.properties is gitignored and will not be committed.
+
+# H2 file-based database for local development
+spring.datasource.url=jdbc:h2:file:./data/mixer;AUTO_SERVER=TRUE
+spring.h2.console.enabled=true
+
+# Oanda FX provider
+mixer.currency.provider=oanda
+mixer.currency.token=YOUR_OANDA_TOKEN_HERE
+
+# Seed data (creates demo portfolio on first run)
+mixer.data.seed.insert=true

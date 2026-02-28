@@ -19,6 +19,14 @@
         </encoder>
     </appender>
 
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>/tmp/mixer.log</file>
+        <append>false</append>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%t] %-40.40logger{39} %msg {%mdc}%n%wex</pattern>
+        </encoder>
+    </appender>
+
     <!-- Silence noisy Spring/Hibernate internals at WARN -->
     <logger name="org.springframework" level="WARN"/>
     <logger name="org.jobrunr" level="WARN"/>
@@ -30,5 +38,6 @@
 
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
     </root>
 </configuration>

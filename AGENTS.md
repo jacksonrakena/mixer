@@ -4,13 +4,14 @@ Mixer is a portfolio tracking application for managing financial assets, transac
 
 ## Tech Stack
 
-- **Backend**: Kotlin 2.2 + Spring Boot + Exposed ORM + JobRunr (async jobs)
+- **Backend**: Kotlin 2.2 + Spring Boot 4 + Exposed ORM + JobRunr (async jobs)
 - **Frontend**: React 19 + TypeScript 5.9 + MUI Joy UI + Vite 8 + MUI X Charts
 - **Database**: H2 file-based (`jdbc:h2:file:./data/mixer`) for development, PostgreSQL (latest) for production. Exposed auto-DDL, data persists across restarts
 - **DB Compatibility**: Only use SQL features supported by both H2 and PostgreSQL. Notably: no `INSERT IGNORE` (H2 requires MySQL mode), use `upsert` (Exposed's `MERGE`/`ON CONFLICT`) instead. No H2-specific SQL syntax.
-- **Sessions**: Spring Session JDBC (`@EnableJdbcHttpSession`), stored in H2 `SPRING_SESSION` tables
+- **Sessions**: Spring Session JDBC (`@EnableJdbcHttpSession` in `SecurityConfig`), schema auto-created via `DataSourceInitializer` bean
 - **Build**: Gradle (Kotlin DSL), Java 21 target
 - **Frontend build**: Yarn, `npx tsc --noEmit` for type checking
+- **CI**: GitHub Actions → test + build Docker image → push to GHCR
 
 ## Build & Test Commands
 
@@ -37,6 +38,7 @@ src/main/kotlin/com/jacksonrakena/mixer/
 ├── controller/
 │   ├── admin/AdminController.kt     # Admin endpoints: force reaggregation, create user, seed data
 │   ├── auth/AuthController.kt       # Auth: login, signup, logout, profile CRUD, timezone change triggers reaggregation
+│   ├── config/ConfigController.kt   # Public /config endpoint: serves supported currencies to frontend
 │   ├── asset/
 │   │   ├── AssetController.kt       # CRUD for assets
 │   │   ├── AssetDto.kt              # Asset response DTO (includes staleAfter, aggregatedThrough)
@@ -52,16 +54,16 @@ src/main/kotlin/com/jacksonrakena/mixer/
 │   ├── tables/concrete/             # Exposed table definitions: User, Asset, Transaction, UserRole
 │   ├── tables/virtual/              # AssetAggregate (generated aggregation table)
 │   └── tables/markets/              # ExchangeRate table
-├── security/SecurityConfig.kt       # Spring Security: session-based auth, CSRF disabled, CORS open
+├── security/SecurityConfig.kt       # Spring Security: session-based auth, CSRF disabled, CORS open, @EnableJdbcHttpSession + schema init
 ├── core/
 │   ├── bootstrap/
-│   │   ├── AggregationRefreshScheduler.kt  # Runs every 5 min, refreshes stale aggregations
-│   │   └── CurrencyBootstrap.kt     # On startup: enqueues FX backfill jobs + seed data
+│   │   ├── RecurringTaskScheduler.kt   # Scheduled tasks: aggregation refresh + FX backfill (intervals configurable)
+│   │   └── BootstrapTaskExecutor.kt    # On startup: enqueues seed data (if mixer.data.seed.insert=true)
 │   └── requests/                    # JobRunr job request classes
-│       ├── InsertSeedDataRequest.kt  # Loads seed data from CSV files
+│       ├── InsertSeedDataRequest.kt  # Loads seed data from CSV files (skips if user already exists)
 │       ├── RecomputeAssetAggregationRequest.kt  # Reaggregates single asset
 │       ├── RecomputeUserAggregationRequest.kt   # Reaggregates all assets for a user
-│       └── BackfillCurrencyPairRequest.kt       # Fetches historical FX rates
+│       └── BackfillCurrencyPairRequest.kt       # Fetches historical FX rates (incremental, uses upsert)
 ├── upstream/                        # External API clients (Oanda FX service)
 ├── web/MdcRequestInterceptor.kt     # MDC logging context
 └── logging/ShortMdcConverter.kt     # Log format helper
@@ -157,7 +159,8 @@ src/main/resources/
 
 - **Session-based** via Spring Security (not JWT)
 - Login creates `UsernamePasswordAuthenticationToken`, saves to HTTP session
-- Sessions stored in H2 via Spring Session JDBC (lost on restart due to in-memory DB)
+- Sessions stored in DB via Spring Session JDBC (`@EnableJdbcHttpSession` + `DataSourceInitializer` for schema)
+- Session cookie name is `SESSION` (not `JSESSIONID`) — confirms Spring Session is active
 - CSRF disabled, CORS allows all origins
 - Admin routes (`/admin/**`) require `GLOBAL_ADMIN` role
 - Frontend uses `AuthContext` to manage auth state, calls `fetchMe()` on mount to restore session
@@ -202,8 +205,10 @@ This is the most complex subsystem. Key concepts:
 - Portfolio chart polls all assets and shows overlay if any asset is stale.
 
 ### Scheduled Refresh
-- `AggregationRefreshScheduler` runs every 5 minutes.
-- Calls `ensureAllAggregationsUpToDate()` which checks each asset's `aggregatedThrough` vs today (in user's timezone).
+- `RecurringTaskScheduler` runs aggregation refresh and FX backfill on configurable intervals.
+- Intervals configured via `mixer.refresh.aggregations.*` and `mixer.refresh.fx.*` properties.
+- Aggregation refresh calls `ensureAllAggregationsUpToDate()` which checks each asset's `aggregatedThrough` vs today (in user's timezone).
+- FX backfill enqueues `BackfillCurrencyPairRequest` jobs for all configured currency pairs.
 - Stale assets are re-aggregated automatically.
 
 ## FX Conversion
@@ -213,9 +218,10 @@ This is the most complex subsystem. Key concepts:
 - `findRatesInRange()` bulk-loads rates for a date range.
 - `AggregateController.applyFxConversion()` converts aggregation values from asset's native currency to user's display currency.
 - Portfolio aggregation sums all assets' values after FX conversion.
-- Supported currencies: EUR, GBP, AUD, NZD, USD, HKD.
+- Supported currencies configured via `mixer.fx.currencies` property (default: EUR, GBP, AUD, NZD, USD, HKD).
 - FX data sourced from Oanda via `CurrencyService`.
-- `CurrencyBootstrap` enqueues backfill jobs for all pairs on startup.
+- `RecurringTaskScheduler` enqueues incremental backfill jobs for all pairs on a configurable schedule.
+- Backfill is incremental: finds the latest existing rate per pair, fetches only new data, uses `upsert` to handle overlaps.
 
 ## Frontend Architecture
 
@@ -254,7 +260,8 @@ This is the most complex subsystem. Key concepts:
 - `transactions.csv`: ~193 transactions with asset_ref, days_ago, type, amount, value.
 - Transactions get random time-of-day offsets (fixed seed 42 for reproducibility).
 - Creates admin user (admin@mixer.local / admin123) with GLOBAL_ADMIN role.
-- Enqueues aggregation job after seeding.
+- **Skips insertion if the seed user already exists** (safe for restarts with persistent DB).
+- Controlled by `mixer.data.seed.insert` property (default: `true`).
 
 ## Background Jobs (JobRunr)
 
@@ -272,14 +279,19 @@ This is the most complex subsystem. Key concepts:
 1. **Dates as strings, not Instants** — Aggregation dates are ISO strings to avoid timezone-dependent serialization bugs.
 2. **nativeValue fallback is 0.0** — If no unit price is available, value is 0 (not the holding amount).
 3. **Timezone read once, passed through** — Avoids repeated DB queries during aggregation.
-4. **Session-based auth** — Uses Spring Security sessions, not JWT. Sessions lost on H2 restart.
+4. **Session-based auth** — Uses Spring Security sessions, not JWT. Sessions persist across restarts via Spring Session JDBC.
 5. **Aggregation range queries use `>=` and `<=`** — Inclusive bounds to include today's data point.
 6. **fillDateRange carries forward correctly** — Tracks `lastAmount` (holding) separately from `lastNativeValue` (monetary value).
+7. **Shared DataSource** — Exposed ORM and Spring Session JDBC share the same `DataSource` bean (not separate connections).
+8. **Incremental FX backfill** — Only fetches new rates since the latest existing record per currency pair.
+9. **All config externalised** — Intervals, currencies, seed data toggle all via `application.properties` / env vars.
 
 ## Common Pitfalls
 
-- The H2 database is in-memory (`jdbc:h2:mem:test`). All data is lost on backend restart.
 - `regenerateAggregatesForAsset()` requires a `userTimezone` parameter (second arg). Tests use `TimeZone.UTC`.
 - Frontend `toLocalDateString()` must use local date components, not `toISOString()` (which returns UTC date).
 - `Asset innerJoin User` works because `Asset.ownerId` has `.references(User.id)` — it's an Exposed infix function.
-- When adding new currencies, update the pairs list in `CurrencyBootstrap` and `CURRENCY_NAMES` in `App.tsx`.
+- When adding new currencies, update `mixer.fx.currencies` in `application.properties` and `CURRENCY_NAMES` in `App.tsx`.
+- The `Database.connect()` bean in `MixerApplication.kt` must use the injected `DataSource`, not a hardcoded URL — otherwise Exposed and Spring Session use different databases.
+- Spring Boot 4 removed session auto-configuration — `@EnableJdbcHttpSession` is required, plus a `DataSourceInitializer` bean to create the schema tables.
+- `RecurringTaskScheduler` initial delays prevent race conditions with Exposed DDL creation on startup.
