@@ -12,7 +12,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   fetchPortfolioAggregation,
   fetchAllPortfolioAggregation,
-  fetchAssets,
   daysAgo,
   today,
   type PortfolioAggregationPoint,
@@ -71,12 +70,14 @@ function fillDateRange(
 
 interface HomePageProps {
   displayCurrency: SupportedCurrency
+  assets: AssetDto[]
+  refreshAssets: () => Promise<AssetDto[]>
 }
 
-export default function HomePage({ displayCurrency }: HomePageProps) {
+export default function HomePage({ displayCurrency, assets: propAssets, refreshAssets }: HomePageProps) {
   const navigate = useNavigate()
   const [data, setData] = useState<PortfolioAggregationPoint[]>([])
-  const [assets, setAssets] = useState<AssetDto[]>([])
+  const [assets, setAssets] = useState<AssetDto[]>(propAssets)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [range, setRange] = useState<DateRange>('30d')
@@ -117,8 +118,8 @@ export default function HomePage({ displayCurrency }: HomePageProps) {
 
   useEffect(() => { loadData() }, [loadData])
   useEffect(() => {
-    fetchAssets().then(setAssets).catch(() => {})
-  }, [])
+    setAssets(propAssets)
+  }, [propAssets])
 
   // Portfolio is stale if any asset has never been aggregated or has staleAfter > 0
   const isStale = useMemo(() =>
@@ -131,7 +132,7 @@ export default function HomePage({ displayCurrency }: HomePageProps) {
     if (!isStale) return
     const interval = setInterval(async () => {
       try {
-        const refreshed = await fetchAssets()
+        const refreshed = await refreshAssets()
         setAssets(refreshed)
         if (!refreshed.some((a) => a.aggregatedThrough === null || a.staleAfter > 0)) {
           loadData()

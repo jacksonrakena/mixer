@@ -21,10 +21,13 @@ import AdminPage from "./pages/AdminPage.tsx";
 import HomePage from "./pages/HomePage.tsx";
 import AssetPage from "./pages/AssetPage.tsx";
 import { useOutletContext } from "react-router-dom";
-import type { SupportedCurrency } from "./api";
+import type { SupportedCurrency, AssetDto } from "./api";
 
 interface AppContext {
   displayCurrency: SupportedCurrency;
+  assets: AssetDto[];
+  loadingAssets: boolean;
+  refreshAssets: () => Promise<AssetDto[]>;
 }
 
 export function useAppContext() {
@@ -32,13 +35,13 @@ export function useAppContext() {
 }
 
 function HomeWrapper() {
-  const { displayCurrency } = useAppContext();
-  return <HomePage displayCurrency={displayCurrency} />;
+  const { displayCurrency, assets, refreshAssets } = useAppContext();
+  return <HomePage displayCurrency={displayCurrency} assets={assets} refreshAssets={refreshAssets} />;
 }
 
 function AssetWrapper() {
-  const { displayCurrency } = useAppContext();
-  return <AssetPage displayCurrency={displayCurrency} />;
+  const { displayCurrency, assets } = useAppContext();
+  return <AssetPage displayCurrency={displayCurrency} assets={assets} />;
 }
 
 const theme = extendTheme({

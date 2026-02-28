@@ -376,7 +376,7 @@ export default function App() {
           width: '100%',
         }}
       >
-        <Outlet context={{ displayCurrency }} />
+        <Outlet context={{ displayCurrency, assets, loadingAssets, refreshAssets: () => fetchAssets().then((a) => { setAssets(a); return a; }) }} />
       </Box>
 
       {/* Create asset modal */}

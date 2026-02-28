@@ -4,15 +4,16 @@ import Box from '@mui/joy/Box'
 import Typography from '@mui/joy/Typography'
 import Sheet from '@mui/joy/Sheet'
 import CircularProgress from '@mui/joy/CircularProgress'
-import { fetchAssets, type AssetDto, type SupportedCurrency } from '../api'
+import { type AssetDto, type SupportedCurrency } from '../api'
 import { AssetChart } from '../AssetChart'
 import { TransactionPanel } from '../TransactionPanel'
 
 interface AssetPageProps {
   displayCurrency: SupportedCurrency
+  assets: AssetDto[]
 }
 
-export default function AssetPage({ displayCurrency }: AssetPageProps) {
+export default function AssetPage({ displayCurrency, assets: propAssets }: AssetPageProps) {
   const { assetId } = useParams<{ assetId: string }>()
   const [asset, setAsset] = useState<AssetDto | null>(null)
   const [loading, setLoading] = useState(true)
@@ -22,18 +23,14 @@ export default function AssetPage({ displayCurrency }: AssetPageProps) {
   useEffect(() => {
     if (!assetId) return
     setLoading(true)
-    fetchAssets()
-      .then((assets) => {
-        const found = assets.find((a) => a.id === assetId) ?? null
-        setAsset(found)
-        if (found) {
-          setStaleAfter(found.staleAfter)
-          setAggregatedThrough(found.aggregatedThrough)
-        }
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [assetId])
+    const found = propAssets.find((a) => a.id === assetId) ?? null
+    setAsset(found)
+    if (found) {
+      setStaleAfter(found.staleAfter)
+      setAggregatedThrough(found.aggregatedThrough)
+    }
+    setLoading(false)
+  }, [assetId, propAssets])
 
   const handleTransactionChange = useCallback((newStaleAfter: number) => {
     if (newStaleAfter > 0) setStaleAfter(newStaleAfter)
