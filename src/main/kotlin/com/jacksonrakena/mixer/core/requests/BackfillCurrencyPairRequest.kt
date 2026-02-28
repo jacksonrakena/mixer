@@ -61,7 +61,7 @@ data class BackfillCurrencyPairRequest(val base: String, val counter: String): J
                     val lastTradingDay = generateSequence(today) { it.minusDays(1) }
                         .first { it.dayOfWeek != DayOfWeek.SATURDAY && it.dayOfWeek != DayOfWeek.SUNDAY }
                     if (!javaDate.isBefore(lastTradingDay)) {
-                        logger.info { "${request.base}/${request.counter} is up to date (latest: $latestExisting)" }
+//                        logger.info { "${request.base}/${request.counter} is up to date (latest: $latestExisting)" }
                         return
                     }
                     javaDate.plusDays(1).atStartOfDay(ZoneOffset.UTC)

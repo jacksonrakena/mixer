@@ -16,6 +16,7 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.greater
+import org.jetbrains.exposed.v1.core.greaterEq
 import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.core.or
@@ -97,8 +98,8 @@ class UserAggregationManager(
                 } else {
                     Transaction.selectAll()
                         .where {
-                            (Transaction.assetId eq asset) //and
-                            //  / /(Transaction.timestamp greater after.to()) TODO fix
+                            (Transaction.assetId eq asset) and
+                                (Transaction.timestamp greaterEq after.toEpochMilliseconds())
                         }
                 }.orderBy(Transaction.timestamp, SortOrder.DESC)
 
@@ -156,27 +157,98 @@ class UserAggregationManager(
         assetId: Uuid,
         userTimezone: TimeZone,
     ) {
-        clearAggregatesForAsset(assetId)
+        val totalStart = System.nanoTime()
         MDC.put("assetId", assetId.toString())
         try {
             val today = Clock.System.now().toLocalDateTime(userTimezone).date
 
-            // Resolve provider info for market data lookup
-            val (provider, providerData) = transaction {
-                val row = Asset.selectAll().where { Asset.id eq assetId }.firstOrNull()
-                    ?: return@transaction Pair("USER", null as String?)
-                Pair(row[Asset.provider], row[Asset.providerData])
+            // Resolve provider info and staleness state
+            val resolveStart = System.nanoTime()
+            val assetRow = transaction {
+                Asset.selectAll().where { Asset.id eq assetId }.firstOrNull()
+            }
+            if (assetRow == null) {
+                logger.warn { "Asset $assetId not found, skipping reaggregation" }
+                return
+            }
+            val provider = assetRow[Asset.provider]
+            val providerData = assetRow[Asset.providerData]
+            val staleAfter = assetRow[Asset.staleAfter]
+            val currentAggregatedThrough = assetRow[Asset.aggregatedThrough]
+            val resolveMs = (System.nanoTime() - resolveStart) / 1_000_000.0
+
+            // Skip if asset is already fully up-to-date (handles duplicate job enqueuing)
+            if (staleAfter == 0L && currentAggregatedThrough != null && currentAggregatedThrough >= today) {
+                val totalMs = (System.nanoTime() - totalStart) / 1_000_000.0
+                logger.info { "Asset $assetId already up-to-date (through=$currentAggregatedThrough), skipping | total=${String.format("%.1f", totalMs)}ms" }
+                return
             }
 
-            val marketPrices: Map<LocalDate, Double>? = resolveMarketPrices(provider, providerData, today, assetId)
+            // Determine if partial reaggregation is possible:
+            // requires a staleAfter marker and at least one existing aggregate before that date
+            data class PartialState(
+                val startDate: LocalDate,
+                val initialHolding: Double,
+                val initialPrice: Double?,
+                val initialPriceDate: LocalDate?,
+            )
+            val partialStart = System.nanoTime()
+            val partialState: PartialState? = if (staleAfter > 0L) {
+                val staleDate = Instant.fromEpochMilliseconds(staleAfter).toLocalDateTime(userTimezone).date
+                val lastValid = transaction {
+                    AssetAggregate.selectAll()
+                        .where {
+                            (AssetAggregate.assetId eq assetId) and
+                                    (AssetAggregate.periodEndDate less staleDate)
+                        }
+                        .orderBy(AssetAggregate.periodEndDate, SortOrder.DESC)
+                        .limit(1)
+                        .firstOrNull()
+                }
+                if (lastValid != null) {
+                    PartialState(
+                        startDate = staleDate,
+                        initialHolding = lastValid[AssetAggregate.holding],
+                        initialPrice = lastValid[AssetAggregate.unitPrice],
+                        initialPriceDate = lastValid[AssetAggregate.valueDate],
+                    )
+                } else null
+            } else null
 
+            val deleteStart = System.nanoTime()
+            val partialCheckMs = (deleteStart - partialStart) / 1_000_000.0
+            if (partialState != null) {
+                transaction {
+                    AssetAggregate.deleteWhere {
+                        (AssetAggregate.assetId eq assetId) and
+                                (AssetAggregate.periodEndDate greaterEq partialState.startDate)
+                    }
+                }
+                logger.info { "Partial reaggregation for asset $assetId from ${partialState.startDate}" }
+            } else {
+                clearAggregatesForAsset(assetId)
+            }
+            val deleteMs = (System.nanoTime() - deleteStart) / 1_000_000.0
+
+            val marketStart = System.nanoTime()
+            val marketPrices: Map<LocalDate, Double>? = resolveMarketPrices(provider, providerData, today, assetId)
+            val marketMs = (System.nanoTime() - marketStart) / 1_000_000.0
+
+            val aggStart = System.nanoTime()
             val aggregates = aggregationService.forwardAggregate(
                 assetId,
                 userTimezone,
                 DatabaseAssetTransactionSource(),
                 today,
                 marketPrices,
+                startOverride = partialState?.startDate,
+                initialHolding = partialState?.initialHolding ?: 0.0,
+                initialPrice = partialState?.initialPrice,
+                initialPriceDate = partialState?.initialPriceDate,
             )
+            val aggMs = (System.nanoTime() - aggStart) / 1_000_000.0
+
+            val insertStart = System.nanoTime()
             transaction {
                 AssetAggregate.batchInsert(aggregates) { agg ->
                     this[AssetAggregate.assetId] = assetId
@@ -194,8 +266,26 @@ class UserAggregationManager(
                 Asset.update({ Asset.id eq assetId }) {
                     it[aggregatedThrough] = today
                 }
+                // Only clear staleAfter if it hasn't been modified since we read it,
+                // preserving any new staleness markers set by concurrent transaction changes
+                Asset.update({ (Asset.id eq assetId) and (Asset.staleAfter eq staleAfter) }) {
+                    it[Asset.staleAfter] = 0L
+                }
             }
-            logger.info { "Regenerated aggregates for asset $assetId, total ${aggregates.size} entries, through $today" }
+            val insertMs = (System.nanoTime() - insertStart) / 1_000_000.0
+            val totalMs = (System.nanoTime() - totalStart) / 1_000_000.0
+
+            val mode = if (partialState != null) "partial(from=${partialState.startDate})" else "full"
+            logger.info {
+                "Reaggregation complete for asset $assetId: mode=$mode, entries=${aggregates.size}, through=$today | " +
+                "total=${String.format("%.1f", totalMs)}ms " +
+                "[resolve=${String.format("%.1f", resolveMs)}ms, " +
+                "partialCheck=${String.format("%.1f", partialCheckMs)}ms, " +
+                "delete=${String.format("%.1f", deleteMs)}ms, " +
+                "market=${String.format("%.1f", marketMs)}ms, " +
+                "aggregate=${String.format("%.1f", aggMs)}ms, " +
+                "insert=${String.format("%.1f", insertMs)}ms]"
+            }
         } finally {
             MDC.remove("assetId")
         }

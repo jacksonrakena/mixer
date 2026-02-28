@@ -66,7 +66,7 @@ export interface DeleteTransactionResponse {
   transactionId: string;
   assetId: string;
   deleted: boolean;
-  jobId: string;
+  jobId: string | null;
   staleAfter: number; // epoch millis
 }
 

@@ -8,7 +8,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.TimeZone
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.jdbc.update
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jobrunr.jobs.lambdas.JobRequest
@@ -49,13 +48,6 @@ class RecomputeAssetAggregationRequest(
                 runBlocking {
                     userAggregationManager.regenerateAggregatesForAsset(request.assetId, userTimezone)
                 }
-
-                transaction {
-                    Asset.update({ Asset.id eq request.assetId }) {
-                        it[staleAfter] = 0L
-                    }
-                }
-                logger.info { "Cleared staleAfter for asset ${request.assetId}" }
             } finally {
                 MDC.remove("assetId")
             }

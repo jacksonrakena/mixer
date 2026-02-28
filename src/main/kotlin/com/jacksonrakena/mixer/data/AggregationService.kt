@@ -3,6 +3,8 @@ package com.jacksonrakena.mixer.data
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atTime
+import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import org.springframework.stereotype.Component
 import kotlin.uuid.ExperimentalUuidApi
@@ -20,6 +22,10 @@ class AggregationService {
      *                     When non-null, nativeValue = holding × price (with carry-forward for missing dates).
      *                     When null (USER mode), unit price is derived from transaction value/amount
      *                     and carried forward for days without transactions.
+     * @param startOverride if provided, starts aggregation from this date instead of the earliest transaction.
+     * @param initialHolding starting holding amount (for partial reaggregation from a known state).
+     * @param initialPrice starting unit price (for partial reaggregation).
+     * @param initialPriceDate the date of the starting unit price (for partial reaggregation).
      */
     suspend fun forwardAggregate(
         asset: Uuid,
@@ -27,22 +33,34 @@ class AggregationService {
         ats: AssetTransactionSource,
         end: LocalDate,
         marketPrices: Map<LocalDate, Double>? = null,
+        startOverride: LocalDate? = null,
+        initialHolding: Double = 0.0,
+        initialPrice: Double? = null,
+        initialPriceDate: LocalDate? = null,
     ): Collection<AssetTransactionAggregation> {
-        val start = ats.getEarliestTransaction(asset)?.timestamp ?: return emptyList()
-        val transactions = ats.getTransactions(asset, start)
+        val startDate: LocalDate
+        val transactions: List<AssetTransaction>
+
+        if (startOverride != null) {
+            startDate = startOverride
+            val startInstant = startOverride.atTime(0, 0).toInstant(timezone)
+            transactions = ats.getTransactions(asset, startInstant).toList()
+        } else {
+            val earliest = ats.getEarliestTransaction(asset)?.timestamp ?: return emptyList()
+            startDate = earliest.toLocalDateTime(timezone).date
+            transactions = ats.getTransactions(asset).toList()
+        }
+
+        val transactionsByDate = transactions.groupBy { it.timestamp.toLocalDateTime(timezone).date }
         val dailyAggregations = mutableListOf<AssetTransactionAggregation>()
-        var currentHolding = 0.0
+        var currentHolding = initialHolding
 
-        val startDate = start.toLocalDateTime(timezone).date
+        val dayCount = end.toEpochDays() - startDate.toEpochDays() + 1
+        var lastKnownPrice: Double? = initialPrice
+        var lastKnownPriceDate: LocalDate? = initialPriceDate
 
-        val dateSpan = startDate..end
-        logger.info { "Opening aggregation window from $startDate to $end, total ${dateSpan.count()} days" }
-
-        var lastKnownPrice: Double? = null
-        var lastKnownPriceDate: LocalDate? = null
-
-        for (day in dateSpan) {
-            val transactionsForDay = transactions.filter { it.timestamp.toLocalDateTime(timezone).date == day }.sortedBy { it.timestamp }
+        for (day in startDate..end) {
+            val transactionsForDay = transactionsByDate[day]?.sortedBy { it.timestamp } ?: emptyList()
 
             var amountDeltaReconciliation = 0.0
             var amountDeltaTrades = 0.0

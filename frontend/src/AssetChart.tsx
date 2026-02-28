@@ -521,18 +521,9 @@ export const AssetChart = ({
     return { start, end };
   }, [range]);
 
-  // Determine if the chart's visible range includes the stale date or aggregation hasn't run yet
-  const isStale = useMemo(() => {
-    if (aggregatedThrough === null) return true;
-    if (staleAfter === 0) return false;
-    if (range === "all") return true; // "all" always includes the stale date
-    const staleDate = new Date(staleAfter).toISOString().slice(0, 10);
-    return (
-      chartRange !== null &&
-      staleDate >= chartRange.start &&
-      staleDate <= chartRange.end
-    );
-  }, [aggregatedThrough, staleAfter, chartRange, range]);
+  // Asset is stale if it has never been aggregated or has a non-zero staleAfter marker.
+  // Even transactions before the visible chart range affect holdings/values within the range.
+  const isStale = aggregatedThrough === null || staleAfter !== 0;
 
   // Fetch aggregation data
   const loadData = useCallback(() => {

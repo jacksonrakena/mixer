@@ -136,14 +136,20 @@ class AssetTransactionController(
             }
         }
 
-        val jobId = scheduler.enqueue(RecomputeAssetAggregationRequest(assetUuid))
-        logger.info { "Deleted transaction $transactionUuid, scheduled RecomputeAssetAggregationRequest $jobId for asset $assetUuid" }
+        val jobId = if (deleted) {
+            val id = scheduler.enqueue(RecomputeAssetAggregationRequest(assetUuid))
+            logger.info { "Deleted transaction $transactionUuid, scheduled RecomputeAssetAggregationRequest $id for asset $assetUuid" }
+            id.asUUID().toKotlinUuid()
+        } else {
+            logger.info { "Transaction $transactionUuid not found, skipping reaggregation for asset $assetUuid" }
+            null
+        }
 
         return DeleteTransactionResponse(
             transactionId = transactionUuid,
             assetId = assetUuid,
             deleted = deleted,
-            jobId = jobId.asUUID().toKotlinUuid(),
+            jobId = jobId,
             staleAfter = staleAfter
         )
     }

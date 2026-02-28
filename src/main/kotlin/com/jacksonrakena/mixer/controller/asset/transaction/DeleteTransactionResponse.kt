@@ -8,6 +8,6 @@ data class DeleteTransactionResponse(
     val transactionId: Uuid,
     val assetId: Uuid,
     val deleted: Boolean,
-    val jobId: Uuid,
+    val jobId: Uuid?,
     val staleAfter: Long
 )
