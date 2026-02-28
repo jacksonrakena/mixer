@@ -49,8 +49,10 @@ export default function SignupPage() {
       <Sheet
         variant="outlined"
         sx={{
-          width: 380,
-          p: 4,
+          width: '100%',
+          maxWidth: 380,
+          mx: 2,
+          p: { xs: 3, sm: 4 },
           borderRadius: '16px',
         }}
       >

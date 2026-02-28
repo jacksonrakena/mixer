@@ -396,7 +396,7 @@ export default function HomePage({ displayCurrency }: HomePageProps) {
           <Typography level="title-sm" sx={{ color: 'neutral.500', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 1.5, fontWeight: 600 }}>
             Asset Breakdown
           </Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 1.5 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(auto-fill, minmax(240px, 1fr))' }, gap: 1.5 }}>
             {latestBreakdown.map((asset) => {
               const pct = currentValue && currentValue > 0 ? (asset.value / currentValue) * 100 : 0
               const assetInfo = assets.find((a) => a.id === asset.assetId)

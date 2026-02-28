@@ -163,7 +163,7 @@ export default function AdminPage() {
           <Box sx={{ p: 2 }}>
             <Sheet variant="soft" sx={{ borderRadius: '12px', p: 2 }}>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5 }}>
                   <FormControl size="sm" sx={{ flex: 1 }}>
                     <FormLabel>Display Name</FormLabel>
                     <Input value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="John Smith" />
@@ -173,7 +173,7 @@ export default function AdminPage() {
                     <Input value={createEmail} onChange={(e) => setCreateEmail(e.target.value)} placeholder="user@example.com" type="email" />
                   </FormControl>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-end' }}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5, alignItems: { sm: 'flex-end' } }}>
                   <FormControl size="sm" sx={{ flex: 1 }}>
                     <FormLabel>Password</FormLabel>
                     <Input value={createPassword} onChange={(e) => setCreatePassword(e.target.value)} placeholder="Min 8 characters" type="password" />
@@ -204,6 +204,7 @@ export default function AdminPage() {
             <CircularProgress size="sm" />
           </Box>
         ) : (
+          <Box sx={{ overflow: 'auto' }}>
           <Table
             stripe="odd"
             sx={{
@@ -265,6 +266,7 @@ export default function AdminPage() {
               ))}
             </tbody>
           </Table>
+          </Box>
         )}
       </Sheet>
 
@@ -293,7 +295,7 @@ export default function AdminPage() {
           </Button>
         </Box>
         {counts ? (
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1.5 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' }, gap: 1.5 }}>
             {(Object.entries(counts) as [string, number][]).map(([key, value]) => (
               <Sheet key={key} variant="soft" sx={{ borderRadius: '10px', p: 1.5, textAlign: 'center' }}>
                 <Typography level="h4" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>

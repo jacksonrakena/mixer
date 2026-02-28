@@ -8,6 +8,7 @@ import Menu from '@mui/joy/Menu'
 import MenuItem from '@mui/joy/MenuItem'
 import MenuButton from '@mui/joy/MenuButton'
 import Dropdown from '@mui/joy/Dropdown'
+import Drawer from '@mui/joy/Drawer'
 import CircularProgress from '@mui/joy/CircularProgress'
 import { fetchAssets, fetchConfig, type AssetDto, type SupportedCurrency } from './api'
 import { CreateAssetModal } from './AssetList'
@@ -29,6 +30,7 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [currencies, setCurrencies] = useState<string[]>([])
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
     fetchAssets()
@@ -40,39 +42,28 @@ export default function App() {
       .catch(console.error)
   }, [])
 
+  // Close mobile drawer on navigation
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [location.pathname])
+
   const currentAssetId = location.pathname.startsWith('/asset/') ? location.pathname.split('/')[2] : null
 
   const sidebarWidth = collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH
 
-  return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.body', display: 'flex' }}>
-      {/* Sidebar */}
-      <Box
-        component="nav"
-        sx={{
-          width: sidebarWidth,
-          flexShrink: 0,
-          height: '100vh',
-          position: 'sticky',
-          top: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          borderRight: '1px solid',
-          borderColor: 'neutral.200',
-          bgcolor: 'background.surface',
-          transition: 'width 0.2s ease',
-          overflow: 'hidden',
-        }}
-      >
+  const sidebarContent = (mobile: boolean) => {
+    const isCollapsed = mobile ? false : collapsed
+    return (
+      <>
         {/* Brand */}
         <Box
           sx={{
-            px: collapsed ? 0 : 2.5,
+            px: isCollapsed ? 0 : 2.5,
             py: 2,
             display: 'flex',
             alignItems: 'center',
             gap: 1.5,
-            justifyContent: collapsed ? 'center' : 'flex-start',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
             cursor: 'pointer',
           }}
           onClick={() => navigate('/')}
@@ -94,7 +85,7 @@ export default function App() {
           >
             M
           </Box>
-          {!collapsed && (
+          {!isCollapsed && (
             <Typography level="title-md" sx={{ fontWeight: 700, letterSpacing: '-0.3px' }}>
               Mixer
             </Typography>
@@ -105,17 +96,15 @@ export default function App() {
 
         {/* Navigation section */}
         <Box sx={{ flex: 1, overflow: 'auto', py: 1 }}>
-          {/* Dashboard link */}
           <SidebarItem
             label="Dashboard"
             icon="📊"
             active={location.pathname === '/'}
-            collapsed={collapsed}
+            collapsed={isCollapsed}
             onClick={() => navigate('/')}
           />
 
-          {/* Assets section */}
-          {!collapsed && (
+          {!isCollapsed && (
             <Typography
               level="body-xs"
               sx={{
@@ -132,7 +121,7 @@ export default function App() {
             </Typography>
           )}
 
-          {collapsed && <Divider sx={{ my: 0.5 }} />}
+          {isCollapsed && <Divider sx={{ my: 0.5 }} />}
 
           {loadingAssets ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
@@ -143,28 +132,25 @@ export default function App() {
               <SidebarItem
                 key={asset.id}
                 label={asset.name}
-                sublabel={!collapsed ? asset.currency : undefined}
+                sublabel={!isCollapsed ? asset.currency : undefined}
                 active={currentAssetId === asset.id}
-                collapsed={collapsed}
+                collapsed={isCollapsed}
                 onClick={() => navigate(`/asset/${asset.id}`)}
               />
             ))
           )}
 
-          {/* Create asset button */}
           <SidebarItem
             label="Create asset"
             icon="＋"
-            collapsed={collapsed}
+            collapsed={isCollapsed}
             onClick={() => setCreateModalOpen(true)}
             muted
           />
 
-          {!collapsed && (
+          {!isCollapsed && (
             <>
               <Divider sx={{ my: 1 }} />
-
-              {/* Display currency selector */}
               <Typography
                 level="body-xs"
                 sx={{
@@ -193,8 +179,8 @@ export default function App() {
         <Divider />
 
         {/* Bottom section — user + collapse toggle */}
-        <Box sx={{ p: collapsed ? 0.5 : 1.5 }}>
-          {!collapsed && (
+        <Box sx={{ p: isCollapsed ? 0.5 : 1.5 }}>
+          {!isCollapsed && (
             <Dropdown>
               <MenuButton
                 variant="plain"
@@ -263,24 +249,116 @@ export default function App() {
             </Dropdown>
           )}
 
-          <IconButton
-            variant="plain"
-            size="sm"
-            onClick={() => setCollapsed(!collapsed)}
-            sx={{
-              mt: collapsed ? 0 : 0.5,
-              mx: collapsed ? 'auto' : 0,
-              display: 'flex',
-              width: collapsed ? undefined : '100%',
-              borderRadius: '8px',
-              color: 'neutral.500',
-              fontSize: '16px',
-            }}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {collapsed ? '»' : '«'}
-          </IconButton>
+          {!mobile && (
+            <IconButton
+              variant="plain"
+              size="sm"
+              onClick={() => setCollapsed(!collapsed)}
+              sx={{
+                mt: isCollapsed ? 0 : 0.5,
+                mx: isCollapsed ? 'auto' : 0,
+                display: 'flex',
+                width: isCollapsed ? undefined : '100%',
+                borderRadius: '8px',
+                color: 'neutral.500',
+                fontSize: '16px',
+              }}
+              title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {isCollapsed ? '»' : '«'}
+            </IconButton>
+          )}
         </Box>
+      </>
+    )
+  }
+
+  return (
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.body', display: 'flex' }}>
+      {/* Mobile top bar */}
+      <Box
+        sx={{
+          display: { xs: 'flex', md: 'none' },
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1100,
+          height: 56,
+          alignItems: 'center',
+          px: 1.5,
+          gap: 1.5,
+          borderBottom: '1px solid',
+          borderColor: 'neutral.200',
+          bgcolor: 'background.surface',
+        }}
+      >
+        <IconButton
+          variant="plain"
+          size="sm"
+          onClick={() => setMobileOpen(true)}
+          sx={{ fontSize: '20px' }}
+        >
+          ☰
+        </IconButton>
+        <Box
+          sx={{
+            width: 28,
+            height: 28,
+            borderRadius: '7px',
+            background: 'linear-gradient(135deg, var(--joy-palette-primary-400), var(--joy-palette-primary-700))',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '12px',
+            fontWeight: 800,
+            color: 'white',
+            flexShrink: 0,
+          }}
+        >
+          M
+        </Box>
+        <Typography level="title-sm" sx={{ fontWeight: 700, letterSpacing: '-0.3px' }}>
+          Mixer
+        </Typography>
+      </Box>
+
+      {/* Mobile drawer */}
+      <Drawer
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        size="sm"
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          '& .MuiDrawer-content': {
+            width: SIDEBAR_WIDTH,
+            display: 'flex',
+            flexDirection: 'column',
+          },
+        }}
+      >
+        {sidebarContent(true)}
+      </Drawer>
+
+      {/* Desktop sidebar */}
+      <Box
+        component="nav"
+        sx={{
+          display: { xs: 'none', md: 'flex' },
+          width: sidebarWidth,
+          flexShrink: 0,
+          height: '100vh',
+          position: 'sticky',
+          top: 0,
+          flexDirection: 'column',
+          borderRight: '1px solid',
+          borderColor: 'neutral.200',
+          bgcolor: 'background.surface',
+          transition: 'width 0.2s ease',
+          overflow: 'hidden',
+        }}
+      >
+        {sidebarContent(false)}
       </Box>
 
       {/* Main content */}
@@ -292,6 +370,7 @@ export default function App() {
           flexDirection: 'column',
           gap: 2.5,
           p: { xs: 1.5, md: 3 },
+          pt: { xs: `${56 + 12}px`, md: 3 },
           maxWidth: 1200,
           mx: 'auto',
           width: '100%',

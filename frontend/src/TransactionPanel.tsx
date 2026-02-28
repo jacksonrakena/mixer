@@ -360,7 +360,7 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
 
       {/* Transaction detail modal */}
       <Modal open={!!selectedTx} onClose={() => setSelectedTx(null)}>
-        <ModalDialog variant="outlined" sx={{ borderRadius: '16px', maxWidth: 420, width: '100%' }}>
+        <ModalDialog variant="outlined" sx={{ borderRadius: '16px', maxWidth: 420, width: '90%' }}>
           <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               Transaction Details
