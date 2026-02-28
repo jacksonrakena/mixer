@@ -436,6 +436,7 @@ function fillDateRange(
   const end = new Date(endIso + "T00:00:00Z");
   let lastDisplayValue = data.length > 0 ? getDisplayValue(data[0]) : 0;
   let lastNativeValue = data.length > 0 ? data[0].nativeValue : 0;
+  let lastAmount = data.length > 0 ? data[0].amount : 0;
   let lastNativeCurrency = data.length > 0 ? data[0].nativeCurrency : null;
   let lastDisplayCurrency = data.length > 0 ? data[0].displayCurrency : null;
   let lastFxConversion = data.length > 0 ? data[0].fxConversion : null;
@@ -448,6 +449,7 @@ function fillDateRange(
     if (existing) {
       lastDisplayValue = getDisplayValue(existing);
       lastNativeValue = existing.nativeValue;
+      lastAmount = existing.amount;
       lastNativeCurrency = existing.nativeCurrency;
       lastDisplayCurrency = existing.displayCurrency;
       lastFxConversion = existing.fxConversion;
@@ -458,7 +460,7 @@ function fillDateRange(
       result.push({
         assetId: data[0]?.assetId ?? "",
         date: cursor.toISOString(),
-        amount: lastNativeValue,
+        amount: lastAmount,
         amountDeltaTrades: 0,
         amountDeltaReconciliation: 0,
         amountDeltaOther: 0,

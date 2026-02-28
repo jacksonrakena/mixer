@@ -44,11 +44,12 @@ class UserAggregationManager(
     suspend fun forceAggregateUserAssets(
         userId: Uuid
     ) {
-        val (existingAssets, userTimezone) = transaction {
+        val result = transaction {
+            val tz = User.selectAll().where { User.id eq userId }.firstOrNull()?.get(User.timezone) ?: return@transaction null
             val assets = Asset.selectAll().where { Asset.ownerId.eq(userId) }.toList()
-            val tz = User.selectAll().where { User.id eq userId }.first()[User.timezone]
             Pair(assets, TimeZone.of(tz))
-        }
+        } ?: return
+        val (existingAssets, userTimezone) = result
         MDC.put("userId", userId.toString())
         try {
             logger.info { "Forcing aggregation for user $userId (tz=$userTimezone), total ${existingAssets.size} assets" }
@@ -181,7 +182,7 @@ class UserAggregationManager(
                     this[AssetAggregate.assetId] = assetId
                     this[AssetAggregate.aggregationPeriod] = AggregationPeriod.DAILY
                     this[AssetAggregate.periodEndDate] =
-                        agg.date.toLocalDateTime(userTimezone).date
+                        LocalDate.parse(agg.date)
                     this[AssetAggregate.totalValue] = agg.nativeValue
                     this[AssetAggregate.holding] = agg.amount
                     this[AssetAggregate.deltaReconciliation] = agg.amountDeltaReconciliation

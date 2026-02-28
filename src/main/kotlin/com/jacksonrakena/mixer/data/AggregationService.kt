@@ -3,8 +3,6 @@ package com.jacksonrakena.mixer.data
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atTime
-import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import org.springframework.stereotype.Component
 import kotlin.uuid.ExperimentalUuidApi
@@ -86,12 +84,12 @@ class AggregationService {
                 valueDate = lastKnownPriceDate
             }
 
-            val nativeValue = if (unitPrice != null) currentHolding * unitPrice else currentHolding
+            val nativeValue = if (unitPrice != null) currentHolding * unitPrice else 0.0
 
             dailyAggregations.add(
                 AssetTransactionAggregation(
                     assetId = asset,
-                    date = day.atTime(23, 59, 0).toInstant(timezone),
+                    date = day.toString(),
                     amount = currentHolding,
                     nativeValue = nativeValue,
                     amountDeltaReconciliation = amountDeltaReconciliation,

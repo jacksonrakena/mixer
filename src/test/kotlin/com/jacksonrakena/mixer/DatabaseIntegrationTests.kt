@@ -226,7 +226,7 @@ class DatabaseIntegrationTests {
             insertTx(assetId, baseTime + 1.days, AssetTransactionType.Trade, 5.0, 50.0)
 
             val manager = createManager()
-            manager.regenerateAggregatesForAsset(assetId)
+            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
 
             val aggregates = transaction(db) {
                 AssetAggregate.selectAll()
@@ -243,7 +243,7 @@ class DatabaseIntegrationTests {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
 
             val manager = createManager()
-            manager.regenerateAggregatesForAsset(assetId)
+            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
 
             // Verify something exists
             val before = transaction(db) {
@@ -264,14 +264,14 @@ class DatabaseIntegrationTests {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
 
             val manager = createManager()
-            manager.regenerateAggregatesForAsset(assetId)
+            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
 
             val countFirst = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
             }
 
             // Regenerate again — should not double up
-            manager.regenerateAggregatesForAsset(assetId)
+            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
 
             val countSecond = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
@@ -285,8 +285,8 @@ class DatabaseIntegrationTests {
             insertTx(otherAssetId, baseTime, AssetTransactionType.Trade, 99.0, 990.0)
 
             val manager = createManager()
-            manager.regenerateAggregatesForAsset(assetId)
-            manager.regenerateAggregatesForAsset(otherAssetId)
+            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
+            manager.regenerateAggregatesForAsset(otherAssetId, kotlinx.datetime.TimeZone.UTC)
 
             val assetAggs = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
@@ -342,7 +342,7 @@ class DatabaseIntegrationTests {
         @Test
         fun `regenerateAggregatesForAsset with no transactions writes nothing`() = runTest {
             val manager = createManager()
-            manager.regenerateAggregatesForAsset(assetId)
+            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
 
             val count = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
@@ -360,7 +360,7 @@ class DatabaseIntegrationTests {
             insertTx(assetId, day2 + 1.minutes, AssetTransactionType.Trade, 3.0, 30.0)
 
             val manager = createManager()
-            manager.regenerateAggregatesForAsset(assetId)
+            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
 
             val aggregates = transaction(db) {
                 AssetAggregate.selectAll()
@@ -387,7 +387,7 @@ class DatabaseIntegrationTests {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
 
             val manager = createManager()
-            manager.regenerateAggregatesForAsset(assetId)
+            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
 
             val aggregatedThrough = transaction(db) {
                 Asset.selectAll().where { Asset.id eq assetId }.first()[Asset.aggregatedThrough]
@@ -429,7 +429,7 @@ class DatabaseIntegrationTests {
 
             val manager = createManager()
             // First call aggregates
-            manager.regenerateAggregatesForAsset(assetId)
+            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
 
             val countAfterFirst = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()

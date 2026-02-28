@@ -69,7 +69,7 @@ export interface FxConversionInfo {
 
 export interface AssetAggregation {
   assetId: string;
-  date: string; // ISO instant string
+  date: string; // ISO date string (YYYY-MM-DD)
   amount: number;
   amountDeltaTrades: number;
   amountDeltaReconciliation: number;
@@ -285,7 +285,10 @@ export async function fetchAssetStaleness(
 
 /** Returns YYYY-MM-DD for a Date object */
 export function toLocalDateString(d: Date): string {
-  return d.toISOString().split("T")[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 /** Returns a date N days ago as YYYY-MM-DD */

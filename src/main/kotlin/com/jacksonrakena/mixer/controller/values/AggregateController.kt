@@ -10,13 +10,11 @@ import com.jacksonrakena.mixer.data.tables.concrete.User
 import com.jacksonrakena.mixer.data.tables.virtual.AssetAggregate
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.core.greater
-import org.jetbrains.exposed.v1.core.less
+import org.jetbrains.exposed.v1.core.greaterEq
+import org.jetbrains.exposed.v1.core.lessEq
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.springframework.http.HttpStatus
@@ -53,15 +51,6 @@ class AggregateController(
     val exchangeRateHelper: ExchangeRateHelper,
 ) {
 
-    /** Resolves the authenticated user's timezone from the database. */
-    private fun currentUserTimezone(): TimeZone {
-        val userId = AuthController.currentUserId()
-        val tz = transaction {
-            User.selectAll().where { User.id eq userId }.first()[User.timezone]
-        }
-        return TimeZone.of(tz)
-    }
-
     @GetMapping("/asset/{id}/{start}/{end}")
     fun getAggregateValue(
         @PathVariable id: String,
@@ -72,20 +61,19 @@ class AggregateController(
         val uuid = Uuid.parse(id)
         val sdate = LocalDate.parse(start)
         val edate = LocalDate.parse(end)
-        val userTimezone = currentUserTimezone()
         val aggregates = transaction {
             AssetAggregate
                 .selectAll()
                 .where {
                     (AssetAggregate.assetId eq uuid) and
                             (AssetAggregate.aggregationPeriod eq AggregationPeriod.DAILY) and
-                            (AssetAggregate.periodEndDate greater sdate) and
-                            (AssetAggregate.periodEndDate less edate)
+                            (AssetAggregate.periodEndDate greaterEq sdate) and
+                            (AssetAggregate.periodEndDate lessEq edate)
                 }
                 .toList()
         }
-        val baseAggs = aggregates.map { AssetTransactionAggregation.fromResultRow(it, userTimezone) }
-        return applyFxConversion(uuid, baseAggs, userTimezone, displayCurrency)
+        val baseAggs = aggregates.map { AssetTransactionAggregation.fromResultRow(it) }
+        return applyFxConversion(uuid, baseAggs, displayCurrency)
     }
 
     @GetMapping("/asset/{id}/all")
@@ -94,7 +82,6 @@ class AggregateController(
         @RequestParam(required = false) displayCurrency: String? = null,
     ): List<AssetTransactionAggregation> {
         val uuid = Uuid.parse(id)
-        val userTimezone = currentUserTimezone()
         val aggregates = transaction {
             AssetAggregate
                 .selectAll()
@@ -104,8 +91,8 @@ class AggregateController(
                 }
                 .toList()
         }
-        val baseAggs = aggregates.map { AssetTransactionAggregation.fromResultRow(it, userTimezone) }
-        return applyFxConversion(uuid, baseAggs, userTimezone, displayCurrency)
+        val baseAggs = aggregates.map { AssetTransactionAggregation.fromResultRow(it) }
+        return applyFxConversion(uuid, baseAggs, displayCurrency)
     }
 
     /**
@@ -115,7 +102,6 @@ class AggregateController(
     private fun applyFxConversion(
         assetId: Uuid,
         aggregations: List<AssetTransactionAggregation>,
-        userTimezone: TimeZone,
         overrideDisplayCurrency: String? = null,
     ): List<AssetTransactionAggregation> {
         if (aggregations.isEmpty()) return aggregations
@@ -143,13 +129,13 @@ class AggregateController(
         }
 
         // Bulk-load exchange rates for the entire date range
-        val dates = aggregations.map { it.date.toLocalDateTime(userTimezone).date }
+        val dates = aggregations.map { LocalDate.parse(it.date) }
         val startDate = dates.min()
         val endDate = dates.max()
         val rateMap = exchangeRateHelper.findRatesInRange(assetCurrency, targetCurrency, startDate, endDate)
 
         return aggregations.map { agg ->
-            val aggDate = agg.date.toLocalDateTime(userTimezone).date
+            val aggDate = LocalDate.parse(agg.date)
             val rateLookup = rateMap[aggDate]
             if (rateLookup != null) {
                 agg.copy(
@@ -181,8 +167,7 @@ class AggregateController(
         @RequestParam(required = false) displayCurrency: String? = null,
     ): List<PortfolioAggregationPoint> {
         val userId = AuthController.currentUserId()
-        val userTimezone = currentUserTimezone()
-        return buildPortfolioAggregation(userId, userTimezone, LocalDate.parse(start), LocalDate.parse(end), displayCurrency)
+        return buildPortfolioAggregation(userId, LocalDate.parse(start), LocalDate.parse(end), displayCurrency)
     }
 
     @GetMapping("/portfolio/all")
@@ -190,13 +175,11 @@ class AggregateController(
         @RequestParam(required = false) displayCurrency: String? = null,
     ): List<PortfolioAggregationPoint> {
         val userId = AuthController.currentUserId()
-        val userTimezone = currentUserTimezone()
-        return buildPortfolioAggregation(userId, userTimezone, null, null, displayCurrency)
+        return buildPortfolioAggregation(userId, null, null, displayCurrency)
     }
 
     private fun buildPortfolioAggregation(
         userId: Uuid,
-        userTimezone: TimeZone,
         startDate: LocalDate?,
         endDate: LocalDate?,
         overrideDisplayCurrency: String?,
@@ -225,27 +208,26 @@ class AggregateController(
                 var condition = (AssetAggregate.assetId eq assetId) and
                         (AssetAggregate.aggregationPeriod eq AggregationPeriod.DAILY)
                 if (startDate != null && endDate != null) {
-                    condition = condition and (AssetAggregate.periodEndDate greater startDate) and (AssetAggregate.periodEndDate less endDate)
+                    condition = condition and (AssetAggregate.periodEndDate greaterEq startDate) and (AssetAggregate.periodEndDate lessEq endDate)
                 }
                 AssetAggregate.selectAll().where { condition }.toList()
             }
             if (aggregates.isEmpty()) continue
 
-            val baseAggs = aggregates.map { AssetTransactionAggregation.fromResultRow(it, userTimezone) }
+            val baseAggs = aggregates.map { AssetTransactionAggregation.fromResultRow(it) }
 
             if (assetCurrency == targetCurrency) {
                 for (agg in baseAggs) {
-                    val dateStr = agg.date.toLocalDateTime(userTimezone).date.toString()
-                    allPoints.add(ConvertedPoint(dateStr, assetId, assetName, assetCurrency, agg.nativeValue))
+                    allPoints.add(ConvertedPoint(agg.date, assetId, assetName, assetCurrency, agg.nativeValue))
                 }
             } else {
-                val dates = baseAggs.map { it.date.toLocalDateTime(userTimezone).date }
+                val dates = baseAggs.map { LocalDate.parse(it.date) }
                 val rateMap = exchangeRateHelper.findRatesInRange(assetCurrency, targetCurrency, dates.min(), dates.max())
                 for (agg in baseAggs) {
-                    val aggDate = agg.date.toLocalDateTime(userTimezone).date
+                    val aggDate = LocalDate.parse(agg.date)
                     val rate = rateMap[aggDate]
                     val convertedValue = if (rate != null) agg.nativeValue * rate.rate else agg.nativeValue
-                    allPoints.add(ConvertedPoint(aggDate.toString(), assetId, assetName, assetCurrency, convertedValue))
+                    allPoints.add(ConvertedPoint(agg.date, assetId, assetName, assetCurrency, convertedValue))
                 }
             }
         }

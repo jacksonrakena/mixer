@@ -15,6 +15,15 @@ import { fetchAssets, SUPPORTED_CURRENCIES, type AssetDto, type SupportedCurrenc
 import { CreateAssetModal } from './AssetList'
 import { useAuth } from './AuthContext'
 
+const CURRENCY_NAMES: Record<string, string> = {
+  AUD: 'Australian Dollar',
+  USD: 'US Dollar',
+  NZD: 'New Zealand Dollar',
+  EUR: 'Euro',
+  GBP: 'British Pound',
+  HKD: 'Hong Kong Dollar',
+}
+
 const SIDEBAR_WIDTH = 260
 const SIDEBAR_COLLAPSED_WIDTH = 56
 
@@ -181,10 +190,34 @@ export default function App() {
                   value={displayCurrency}
                   onChange={(_, val) => val && setDisplayCurrency(val as SupportedCurrency)}
                   size="sm"
-                  sx={{ fontWeight: 600, fontSize: '13px', borderRadius: '8px' }}
+                  renderValue={(selected) => selected ? (
+                    <Box sx={{ textAlign: 'left' }}>
+                      <Typography level="body-sm" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
+                        {selected.value}
+                      </Typography>
+                      <Typography level="body-xs" sx={{ color: 'neutral.500', lineHeight: 1.2 }}>
+                        {CURRENCY_NAMES[selected.value as string] ?? ''}
+                      </Typography>
+                    </Box>
+                  ) : null}
+                  sx={{
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    borderRadius: '8px',
+                    py: 0.75,
+                    textAlign: 'left',
+                    '& .MuiSelect-button': { textAlign: 'left' },
+                  }}
                 >
                   {SUPPORTED_CURRENCIES.map((cur) => (
-                    <Option key={cur} value={cur}>{cur}</Option>
+                    <Option key={cur} value={cur}>
+                      <Box>
+                        <Typography level="body-sm" sx={{ fontWeight: 600 }}>{cur}</Typography>
+                        <Typography level="body-xs" sx={{ color: 'neutral.500' }}>
+                          {CURRENCY_NAMES[cur] ?? cur}
+                        </Typography>
+                      </Box>
+                    </Option>
                   ))}
                 </Select>
               </Box>

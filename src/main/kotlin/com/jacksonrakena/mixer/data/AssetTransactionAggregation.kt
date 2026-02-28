@@ -1,20 +1,17 @@
 package com.jacksonrakena.mixer.data
 
 import com.jacksonrakena.mixer.data.tables.virtual.AssetAggregate
-import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.atTime
+import kotlinx.datetime.toInstant
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.ResultRow
-import kotlin.time.Instant
-import kotlin.time.toJavaInstant
-import kotlin.time.toKotlinInstant
 import kotlin.uuid.Uuid
 
 @Serializable
 data class AssetTransactionAggregation(
     val assetId: Uuid,
-    val date: Instant,
+    val date: String,
 
     /** Holding amount in native asset units. */
     val amount: Double,
@@ -41,13 +38,13 @@ data class AssetTransactionAggregation(
     val unitPrice: Double? = null,
 
     /** The date from which the unit price was sourced (may differ from the aggregation date due to carry-forward). */
-    val valueDate: LocalDate? = null,
+    val valueDate: kotlinx.datetime.LocalDate? = null,
 ) {
     companion object {
-        fun fromResultRow(row: ResultRow, userTimezone: TimeZone): AssetTransactionAggregation {
+        fun fromResultRow(row: ResultRow): AssetTransactionAggregation {
             return AssetTransactionAggregation(
                 assetId = row[AssetAggregate.assetId],
-                date = row[AssetAggregate.periodEndDate].atStartOfDayIn(userTimezone).toJavaInstant().toKotlinInstant(),
+                date = row[AssetAggregate.periodEndDate].toString(),
                 amount = row[AssetAggregate.holding],
                 amountDeltaTrades = row[AssetAggregate.deltaTrades],
                 amountDeltaReconciliation = row[AssetAggregate.deltaReconciliation],
