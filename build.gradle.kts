@@ -6,6 +6,7 @@ plugins {
     kotlin("plugin.serialization")
     id("org.springframework.boot")
     id("io.spring.dependency-management")
+    id("me.champeau.jmh") version "0.7.3"
 }
 
 group = "com.jacksonrakena"
@@ -55,11 +56,25 @@ dependencies {
     testImplementation(Testing.kotest.assertions.core)
 }
 
+dependencies {
+    jmh("org.openjdk.jmh:jmh-core:1.37")
+    jmh("org.openjdk.jmh:jmh-generator-annprocess:1.37")
+    jmh(KotlinX.coroutines.core)
+    jmh("org.jetbrains.kotlinx:kotlinx-datetime:_")
+}
+
 kotlin {
     compilerOptions {
         freeCompilerArgs.addAll("-Xjsr305=strict",
             "-opt-in=kotlin.uuid.ExperimentalUuidApi")
     }
+}
+
+jmh {
+    warmupIterations = 2
+    iterations = 5
+    fork = 1
+    jvmArgs = listOf("-Xms512m", "-Xmx2g")
 }
 
 tasks.withType<Test> {
