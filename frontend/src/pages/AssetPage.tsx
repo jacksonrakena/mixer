@@ -74,6 +74,7 @@ export default function AssetPage({ displayCurrency, assets: propAssets, refresh
         staleAfter={staleAfter}
         aggregatedThrough={aggregatedThrough}
         displayCurrency={displayCurrency}
+        onStaleResolved={refreshAssets}
         headerAction={
           <Dropdown>
             <MenuButton slots={{ root: IconButton }} slotProps={{ root: { variant: 'outlined', color: 'neutral', size: 'sm' } }}>

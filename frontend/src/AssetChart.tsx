@@ -404,6 +404,7 @@ interface AssetChartProps {
   aggregatedThrough: string | null; // ISO date or null if never aggregated
   displayCurrency?: string;
   headerAction?: React.ReactNode;
+  onStaleResolved?: () => void;
 }
 
 type DateRange = "7d" | "30d" | "90d" | "1y" | "all";
@@ -493,6 +494,7 @@ export const AssetChart = ({
   aggregatedThrough: initialAggregatedThrough,
   displayCurrency: displayCurrencyOverride,
   headerAction,
+  onStaleResolved,
 }: AssetChartProps) => {
   const [data, setData] = useState<AssetAggregation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -586,8 +588,9 @@ export const AssetChart = ({
         if (res.staleAfter === 0 && res.aggregatedThrough !== null) {
           setStaleAfter(0);
           setAggregatedThrough(res.aggregatedThrough);
-          // Staleness cleared — refresh the chart data
+          // Staleness cleared — refresh the chart data and notify parent
           loadData();
+          onStaleResolved?.();
         } else {
           setStaleAfter(res.staleAfter);
           setAggregatedThrough(res.aggregatedThrough);
@@ -598,7 +601,7 @@ export const AssetChart = ({
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [isStale, assetId, loadData]);
+  }, [isStale, assetId, loadData, onStaleResolved]);
 
   const currentValue =
     data.length > 0 ? getDisplayValue(data[data.length - 1]) : null;
