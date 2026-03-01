@@ -1,6 +1,6 @@
 package com.jacksonrakena.mixer.core.requests
 
-import com.jacksonrakena.mixer.data.UserAggregationManager
+import com.jacksonrakena.mixer.data.AssetAggregationOrchestrator
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
@@ -20,7 +20,7 @@ class RecomputeUserAggregationRequest(val userId: Uuid) : JobRequest {
     @Component
     class RecomputeUserAggregationRequestHandler(
         val database: Database,
-        val userAggregationManager: UserAggregationManager
+        val assetAggregationOrchestrator: AssetAggregationOrchestrator
     ) : JobRequestHandler<RecomputeUserAggregationRequest> {
         private val logger = KotlinLogging.logger {}
 
@@ -33,7 +33,7 @@ class RecomputeUserAggregationRequest(val userId: Uuid) : JobRequest {
             MDC.put("userId", request.userId.toString())
             try {
                 runBlocking {
-                    userAggregationManager.forceAggregateUserAssets(request.userId)
+                    assetAggregationOrchestrator.forceAggregateUserAssets(request.userId)
                 }
             } finally {
                 MDC.remove("userId")

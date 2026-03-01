@@ -1,6 +1,6 @@
 package com.jacksonrakena.mixer.core.requests
 
-import com.jacksonrakena.mixer.data.UserAggregationManager
+import com.jacksonrakena.mixer.data.AssetAggregationOrchestrator
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import com.jacksonrakena.mixer.data.tables.concrete.User
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -27,7 +27,7 @@ class RecomputeAssetAggregationRequest(
 
     @Component
     class RecomputeAssetAggregationRequestHandler(
-        val userAggregationManager: UserAggregationManager
+        val assetAggregationOrchestrator: AssetAggregationOrchestrator
     ) : JobRequestHandler<RecomputeAssetAggregationRequest> {
         private val logger = KotlinLogging.logger {}
 
@@ -46,7 +46,7 @@ class RecomputeAssetAggregationRequest(
                 }
 
                 runBlocking {
-                    userAggregationManager.regenerateAggregatesForAsset(request.assetId, userTimezone)
+                    assetAggregationOrchestrator.regenerateAggregatesForAsset(request.assetId, userTimezone)
                 }
             } finally {
                 MDC.remove("assetId")

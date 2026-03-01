@@ -2,7 +2,7 @@ package com.jacksonrakena.mixer.core.bootstrap
 
 import com.jacksonrakena.mixer.MixerConfiguration
 import com.jacksonrakena.mixer.core.requests.BackfillCurrencyPairRequest
-import com.jacksonrakena.mixer.data.UserAggregationManager
+import com.jacksonrakena.mixer.data.AssetAggregationOrchestrator
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import org.jobrunr.scheduling.JobRequestScheduler
@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component
 
 @Component
 class RecurringTaskScheduler(
-    private val userAggregationManager: UserAggregationManager,
+    private val assetAggregationOrchestrator: AssetAggregationOrchestrator,
     private val jobRequestScheduler: JobRequestScheduler,
     private val config: MixerConfiguration,
 ) {
@@ -34,7 +34,7 @@ class RecurringTaskScheduler(
     fun refreshAggregations() {
         logger.debug { "Running scheduled aggregation refresh" }
         runBlocking {
-            userAggregationManager.ensureAllAggregationsUpToDate()
+            assetAggregationOrchestrator.ensureAllAggregationsUpToDate()
         }
     }
 

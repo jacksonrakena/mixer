@@ -1,6 +1,10 @@
 package com.jacksonrakena.mixer.data
 import com.jacksonrakena.mixer.data.AssetTransactionType
-import com.jacksonrakena.mixer.data.UserAggregationManager
+import com.jacksonrakena.mixer.data.AggregationService
+import com.jacksonrakena.mixer.data.AggregateRepository
+import com.jacksonrakena.mixer.data.AssetAggregationOrchestrator
+import com.jacksonrakena.mixer.data.DatabaseAssetTransactionSource
+import com.jacksonrakena.mixer.data.MarketPriceResolver
 import com.jacksonrakena.mixer.data.market.MarketDataProvider
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import com.jacksonrakena.mixer.data.tables.concrete.Transaction
@@ -45,12 +49,18 @@ class DatabaseIntegrationTests {
 
     private val baseTime = Instant.parse("2026-01-10T12:00:00Z")
 
-    /** No-op provider for USER asset tests. */
-    private val noOpMarketDataProvider = object : MarketDataProvider {
-        override fun getHistoricalPrices(ticker: String, startDate: LocalDate, endDate: LocalDate) = emptyMap<LocalDate, Double>()
+    private fun createOrchestrator(): AssetAggregationOrchestrator {
+        val noOpProvider = object : MarketDataProvider {
+            override fun getHistoricalPrices(ticker: String, startDate: LocalDate, endDate: LocalDate) = emptyMap<LocalDate, Double>()
+            override fun validateTicker(ticker: String) = true
+        }
+        return AssetAggregationOrchestrator(
+            AggregationService(),
+            AggregateRepository(),
+            MarketPriceResolver(noOpProvider),
+            DatabaseAssetTransactionSource(),
+        )
     }
-
-    private fun createManager() = UserAggregationManager(db, AggregationService(), noOpMarketDataProvider)
 
     @BeforeEach
     fun setup() {
@@ -107,7 +117,7 @@ class DatabaseIntegrationTests {
     @Nested
     inner class `DatabaseAssetTransactionSource queries` {
 
-        private val source = com.jacksonrakena.mixer.data.UserAggregationManager.DatabaseAssetTransactionSource()
+        private val source = DatabaseAssetTransactionSource()
 
         @Test
         fun `getEarliestTransaction returns null for asset with no transactions`() = runTest {
@@ -216,15 +226,15 @@ class DatabaseIntegrationTests {
     }
 
     @Nested
-    inner class `UserAggregationManager` {
+    inner class `Aggregation orchestrator` {
 
         @Test
         fun `regenerateAggregatesForAsset writes aggregates to database`() = runTest {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
             insertTx(assetId, baseTime + 1.days, AssetTransactionType.Trade, 5.0, 50.0)
 
-            val manager = createManager()
-            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
+            val orchestrator = createOrchestrator()
+            orchestrator.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
 
             val aggregates = transaction(db) {
                 AssetAggregate.selectAll()
@@ -240,8 +250,8 @@ class DatabaseIntegrationTests {
         fun `clearAggregatesForAsset removes all aggregates for the asset`() = runTest {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
 
-            val manager = createManager()
-            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
+            val orchestrator = createOrchestrator()
+            orchestrator.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
 
             // Verify something exists
             val before = transaction(db) {
@@ -249,7 +259,7 @@ class DatabaseIntegrationTests {
             }
             (before > 0) shouldBe true
 
-            manager.clearAggregatesForAsset(assetId)
+            orchestrator.clearAggregatesForAsset(assetId)
 
             val after = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
@@ -261,15 +271,15 @@ class DatabaseIntegrationTests {
         fun `regenerateAggregatesForAsset clears old aggregates before writing new ones`() = runTest {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
 
-            val manager = createManager()
-            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
+            val orchestrator = createOrchestrator()
+            orchestrator.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
 
             val countFirst = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
             }
 
             // Regenerate again — should not double up
-            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
+            orchestrator.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
 
             val countSecond = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
@@ -282,9 +292,9 @@ class DatabaseIntegrationTests {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
             insertTx(otherAssetId, baseTime, AssetTransactionType.Trade, 99.0, 990.0)
 
-            val manager = createManager()
-            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
-            manager.regenerateAggregatesForAsset(otherAssetId, kotlinx.datetime.TimeZone.UTC)
+            val orchestrator = createOrchestrator()
+            orchestrator.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
+            orchestrator.regenerateAggregatesForAsset(otherAssetId, kotlinx.datetime.TimeZone.UTC)
 
             val assetAggs = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
@@ -294,7 +304,7 @@ class DatabaseIntegrationTests {
             }
 
             // Clear only one asset
-            manager.clearAggregatesForAsset(assetId)
+            orchestrator.clearAggregatesForAsset(assetId)
 
             val assetAggsAfter = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
@@ -312,8 +322,8 @@ class DatabaseIntegrationTests {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
             insertTx(otherAssetId, baseTime, AssetTransactionType.Trade, 20.0, 200.0)
 
-            val manager = createManager()
-            manager.forceAggregateUserAssets(userId)
+            val orchestrator = createOrchestrator()
+            orchestrator.forceAggregateUserAssets(userId)
 
             val assetAggs = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
@@ -328,8 +338,8 @@ class DatabaseIntegrationTests {
 
         @Test
         fun `forceAggregateUserAssets with unknown user id produces no aggregates`() = runTest {
-            val manager = createManager()
-            manager.forceAggregateUserAssets(Uuid.random())
+            val orchestrator = createOrchestrator()
+            orchestrator.forceAggregateUserAssets(Uuid.random())
 
             val totalAggs = transaction(db) {
                 AssetAggregate.selectAll().count()
@@ -339,8 +349,8 @@ class DatabaseIntegrationTests {
 
         @Test
         fun `regenerateAggregatesForAsset with no transactions writes nothing`() = runTest {
-            val manager = createManager()
-            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
+            val orchestrator = createOrchestrator()
+            orchestrator.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
 
             val count = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
@@ -357,8 +367,8 @@ class DatabaseIntegrationTests {
             insertTx(assetId, day2, AssetTransactionType.Reconciliation, 15.0, 150.0)
             insertTx(assetId, day2 + 1.minutes, AssetTransactionType.Trade, 3.0, 30.0)
 
-            val manager = createManager()
-            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
+            val orchestrator = createOrchestrator()
+            orchestrator.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
 
             val aggregates = transaction(db) {
                 AssetAggregate.selectAll()
@@ -384,8 +394,8 @@ class DatabaseIntegrationTests {
         fun `regenerateAggregatesForAsset sets aggregatedThrough to today`() = runTest {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
 
-            val manager = createManager()
-            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
+            val orchestrator = createOrchestrator()
+            orchestrator.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
 
             val aggregatedThrough = transaction(db) {
                 Asset.selectAll().where { Asset.id eq assetId }.first()[Asset.aggregatedThrough]
@@ -407,8 +417,8 @@ class DatabaseIntegrationTests {
         fun `ensureAllAggregationsUpToDate regenerates assets with null aggregatedThrough`() = runTest {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
 
-            val manager = createManager()
-            manager.ensureAllAggregationsUpToDate()
+            val orchestrator = createOrchestrator()
+            orchestrator.ensureAllAggregationsUpToDate()
 
             val count = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
@@ -425,9 +435,9 @@ class DatabaseIntegrationTests {
         fun `ensureAllAggregationsUpToDate skips assets already aggregated through today`() = runTest {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
 
-            val manager = createManager()
+            val orchestrator = createOrchestrator()
             // First call aggregates
-            manager.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
+            orchestrator.regenerateAggregatesForAsset(assetId, kotlinx.datetime.TimeZone.UTC)
 
             val countAfterFirst = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
@@ -442,7 +452,7 @@ class DatabaseIntegrationTests {
             aggregatedThrough shouldBe today
 
             // ensureAllAggregationsUpToDate should be a no-op since already up-to-date
-            manager.ensureAllAggregationsUpToDate()
+            orchestrator.ensureAllAggregationsUpToDate()
 
             val countAfterEnsure = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
@@ -453,8 +463,8 @@ class DatabaseIntegrationTests {
         @Test
         fun `ensureAllAggregationsUpToDate handles assets with no transactions gracefully`() = runTest {
             // assetId has no transactions
-            val manager = createManager()
-            manager.ensureAllAggregationsUpToDate()
+            val orchestrator = createOrchestrator()
+            orchestrator.ensureAllAggregationsUpToDate()
 
             val count = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
@@ -467,8 +477,8 @@ class DatabaseIntegrationTests {
             insertTx(assetId, baseTime, AssetTransactionType.Trade, 10.0, 100.0)
             insertTx(otherAssetId, baseTime, AssetTransactionType.Trade, 20.0, 200.0)
 
-            val manager = createManager()
-            manager.ensureAllAggregationsUpToDate()
+            val orchestrator = createOrchestrator()
+            orchestrator.ensureAllAggregationsUpToDate()
 
             val assetAggs = transaction(db) {
                 AssetAggregate.selectAll().where { AssetAggregate.assetId eq assetId }.count()
