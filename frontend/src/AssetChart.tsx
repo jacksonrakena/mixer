@@ -509,6 +509,10 @@ export const AssetChart = ({
     y: 0,
   });
 
+  // Drag-to-compare state
+  const [dragStartIndex, setDragStartIndex] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
   // Keep staleAfter/aggregatedThrough in sync when props change
   useEffect(() => {
     setStaleAfter(initialStaleAfter);
@@ -613,7 +617,7 @@ export const AssetChart = ({
   );
   const yValues = useMemo(() => data.map((d) => getDisplayValue(d)), [data]);
 
-  // ── Tooltip mouse handlers ──────────────────────────────────────────────────
+  // ── Tooltip mouse/touch handlers ─────────────────────────────────────────────
 
   /**
    * Extract per-data-point X pixel positions from the SVG line path rendered by
@@ -650,31 +654,21 @@ export const AssetChart = ({
     return positions.length > 0 ? positions : null;
   }, [data]);
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
+  /** Find the closest data point index for a given X position in the container */
+  const findClosestIndex = useCallback(
+    (clientX: number): number | null => {
       const container = containerRef.current;
-      if (!container || data.length === 0) return;
-
+      if (!container || data.length === 0) return null;
       const rect = container.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
+      const mouseX = clientX - rect.left;
       const xPositions = getLinePointXPositions();
-      if (!xPositions || xPositions.length === 0) {
-        setTooltipIndex(null);
-        return;
-      }
+      if (!xPositions || xPositions.length === 0) return null;
 
-      // Check if cursor is within the plot area (between first and last point, with small padding)
       const firstX = xPositions[0];
       const lastX = xPositions[xPositions.length - 1];
       const padding = 5;
-      if (mouseX < firstX - padding || mouseX > lastX + padding) {
-        setTooltipIndex(null);
-        return;
-      }
+      if (mouseX < firstX - padding || mouseX > lastX + padding) return null;
 
-      // Find the closest data point by X position
       let closestIdx = 0;
       let closestDist = Math.abs(mouseX - xPositions[0]);
       for (let i = 1; i < xPositions.length; i++) {
@@ -684,15 +678,88 @@ export const AssetChart = ({
           closestIdx = i;
         }
       }
-
-      setTooltipIndex(closestIdx);
-      setMousePos({ x: mouseX, y: mouseY });
+      return closestIdx;
     },
     [data, getLinePointXPositions],
   );
 
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const container = containerRef.current;
+      if (!container || data.length === 0) return;
+
+      const rect = container.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const idx = findClosestIndex(e.clientX);
+
+      if (idx === null) {
+        if (!isDragging) setTooltipIndex(null);
+        return;
+      }
+
+      setTooltipIndex(idx);
+      setMousePos({ x: mouseX, y: mouseY });
+    },
+    [data, findClosestIndex, isDragging],
+  );
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const idx = findClosestIndex(e.clientX);
+      if (idx !== null) {
+        setDragStartIndex(idx);
+        setIsDragging(true);
+      }
+    },
+    [findClosestIndex],
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setDragStartIndex(null);
+    setIsDragging(false);
+  }, []);
+
   const handleMouseLeave = useCallback(() => {
     setTooltipIndex(null);
+    setDragStartIndex(null);
+    setIsDragging(false);
+  }, []);
+
+  // Touch handlers for mobile tooltip
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      if (e.touches.length === 0) return;
+      const touch = e.touches[0];
+      const container = containerRef.current;
+      if (!container || data.length === 0) return;
+
+      const rect = container.getBoundingClientRect();
+      const touchX = touch.clientX - rect.left;
+      const touchY = touch.clientY - rect.top;
+      const idx = findClosestIndex(touch.clientX);
+
+      if (idx === null) {
+        if (!isDragging) setTooltipIndex(null);
+        return;
+      }
+
+      setTooltipIndex(idx);
+      setMousePos({ x: touchX, y: touchY });
+
+      // Start drag on first touch if not already dragging
+      if (!isDragging) {
+        setDragStartIndex(idx);
+        setIsDragging(true);
+      }
+    },
+    [data, findClosestIndex, isDragging],
+  );
+
+  const handleTouchEnd = useCallback(() => {
+    setTooltipIndex(null);
+    setDragStartIndex(null);
+    setIsDragging(false);
   }, []);
 
   // Compute the X pixel position for the crosshair from the SVG path
@@ -702,6 +769,30 @@ export const AssetChart = ({
     if (!xPositions || tooltipIndex >= xPositions.length) return null;
     return xPositions[tooltipIndex];
   }, [tooltipIndex, data, getLinePointXPositions]);
+
+  // Compute drag-to-compare values
+  const dragInfo = useMemo(() => {
+    if (!isDragging || dragStartIndex === null || tooltipIndex === null || data.length === 0) return null;
+    const startIdx = Math.min(dragStartIndex, tooltipIndex);
+    const endIdx = Math.max(dragStartIndex, tooltipIndex);
+    if (startIdx === endIdx) return null;
+
+    const startVal = getDisplayValue(data[startIdx]);
+    const endVal = getDisplayValue(data[endIdx]);
+    const absChange = endVal - startVal;
+    const pctChange = startVal !== 0 ? (absChange / startVal) * 100 : null;
+    const startDate = new Date(data[startIdx].date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const endDate = new Date(data[endIdx].date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return { startVal, endVal, absChange, pctChange, startDate, endDate };
+  }, [isDragging, dragStartIndex, tooltipIndex, data]);
+
+  // X position for drag start crosshair
+  const dragStartX = useMemo(() => {
+    if (dragStartIndex === null || data.length === 0) return null;
+    const xPositions = getLinePointXPositions();
+    if (!xPositions || dragStartIndex >= xPositions.length) return null;
+    return xPositions[dragStartIndex];
+  }, [dragStartIndex, data, getLinePointXPositions]);
 
   return (
     <Card
@@ -731,30 +822,75 @@ export const AssetChart = ({
             <Box
               sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}
             >
-              {currentValue !== null && (
-                <Typography level="h3" sx={{ fontWeight: 800 }}>
-                  {currentValue.toLocaleString(undefined, {
-                    maximumFractionDigits: 2,
-                  })}
+              {dragInfo ? (
+                <>
+                  <Typography level="h3" sx={{ fontWeight: 800 }}>
+                    {dragInfo.endVal.toLocaleString(undefined, {
+                      maximumFractionDigits: 2,
+                    })}
+                    <Typography
+                      component="span"
+                      level="body-sm"
+                      sx={{ color: "neutral.500", ml: 0.5 }}
+                    >
+                      {effectiveDisplayCurrency}
+                    </Typography>
+                  </Typography>
+                  {dragInfo.pctChange !== null && (
+                    <Chip
+                      size="sm"
+                      variant="soft"
+                      color={dragInfo.absChange >= 0 ? "success" : "danger"}
+                      sx={{ fontWeight: 600 }}
+                    >
+                      {dragInfo.absChange >= 0 ? "+" : ""}
+                      {dragInfo.pctChange.toFixed(2)}%
+                    </Chip>
+                  )}
                   <Typography
-                    component="span"
                     level="body-sm"
-                    sx={{ color: "neutral.500", ml: 0.5 }}
+                    sx={{
+                      color: dragInfo.absChange >= 0 ? "#059669" : "#dc2626",
+                      fontWeight: 600,
+                      fontVariantNumeric: "tabular-nums",
+                    }}
                   >
+                    {dragInfo.absChange >= 0 ? "+" : "−"}
+                    {Math.abs(dragInfo.absChange).toLocaleString(undefined, { maximumFractionDigits: 2 })}{" "}
                     {effectiveDisplayCurrency}
                   </Typography>
-                </Typography>
-              )}
-              {change !== null && (
-                <Chip
-                  size="sm"
-                  variant="soft"
-                  color={isPositive ? "success" : "danger"}
-                  sx={{ fontWeight: 600 }}
-                >
-                  {isPositive ? "+" : ""}
-                  {change.toFixed(2)}%
-                </Chip>
+                  <Typography level="body-xs" sx={{ color: "neutral.400" }}>
+                    {dragInfo.startDate} → {dragInfo.endDate}
+                  </Typography>
+                </>
+              ) : (
+                <>
+                  {currentValue !== null && (
+                    <Typography level="h3" sx={{ fontWeight: 800 }}>
+                      {currentValue.toLocaleString(undefined, {
+                        maximumFractionDigits: 2,
+                      })}
+                      <Typography
+                        component="span"
+                        level="body-sm"
+                        sx={{ color: "neutral.500", ml: 0.5 }}
+                      >
+                        {effectiveDisplayCurrency}
+                      </Typography>
+                    </Typography>
+                  )}
+                  {change !== null && (
+                    <Chip
+                      size="sm"
+                      variant="soft"
+                      color={isPositive ? "success" : "danger"}
+                      sx={{ fontWeight: 600 }}
+                    >
+                      {isPositive ? "+" : ""}
+                      {change.toFixed(2)}%
+                    </Chip>
+                  )}
+                </>
               )}
             </Box>
           </Box>
@@ -822,8 +958,12 @@ export const AssetChart = ({
           <Box
             ref={containerRef}
             onMouseMove={handleMouseMove}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseLeave}
-            sx={{ position: "relative", cursor: isStale ? "default" : "crosshair" }}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            sx={{ position: "relative", cursor: isStale ? "default" : "crosshair", touchAction: "none" }}
           >
             {/* Stale data overlay */}
             {isStale && (
@@ -884,8 +1024,40 @@ export const AssetChart = ({
               />
             )}
 
-            {/* Custom tooltip */}
-            {!isStale && tooltipIndex !== null && data[tooltipIndex] && (
+            {/* Drag start crosshair */}
+            {!isStale && isDragging && dragStartX !== null && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: CHART_MARGIN.top,
+                  bottom: CHART_MARGIN.bottom,
+                  left: dragStartX,
+                  width: "1px",
+                  background: "rgba(0,0,0,0.2)",
+                  pointerEvents: "none",
+                  zIndex: 15,
+                }}
+              />
+            )}
+
+            {/* Drag selection highlight */}
+            {!isStale && isDragging && dragStartX !== null && crosshairX !== null && dragStartX !== crosshairX && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: CHART_MARGIN.top,
+                  bottom: CHART_MARGIN.bottom,
+                  left: Math.min(dragStartX, crosshairX),
+                  width: Math.abs(crosshairX - dragStartX),
+                  background: "rgba(0, 150, 136, 0.08)",
+                  pointerEvents: "none",
+                  zIndex: 14,
+                }}
+              />
+            )}
+
+            {/* Custom tooltip (hidden during drag) */}
+            {!isStale && !isDragging && tooltipIndex !== null && data[tooltipIndex] && (
               <ChartTooltip
                 point={data[tooltipIndex]}
                 currency={currency}
