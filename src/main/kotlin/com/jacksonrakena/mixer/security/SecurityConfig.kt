@@ -26,6 +26,7 @@ class SecurityConfig {
     fun cookieSerializer(): CookieSerializer {
         return DefaultCookieSerializer().apply {
             setSameSite("None")
+            setCookieName("mixer-session-id")
             setUseSecureCookie(true)
         }
     }
