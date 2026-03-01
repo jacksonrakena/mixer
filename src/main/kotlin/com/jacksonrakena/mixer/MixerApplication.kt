@@ -4,9 +4,6 @@ import io.swagger.v3.oas.annotations.OpenAPIDefinition
 import io.swagger.v3.oas.annotations.info.Contact
 import io.swagger.v3.oas.annotations.info.Info
 import org.jetbrains.exposed.v1.jdbc.Database
-import org.jobrunr.jobs.mappers.JobMapper
-import org.jobrunr.storage.InMemoryStorageProvider
-import org.jobrunr.storage.StorageProvider
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.runApplication
@@ -30,11 +27,6 @@ import javax.sql.DataSource
     )
 )
 class MixerApplication {
-    @Bean
-    fun storageProvider(jobMapper: JobMapper): StorageProvider {
-        return InMemoryStorageProvider().also { it.setJobMapper(jobMapper) }
-    }
-
     @Bean
     fun database(dataSource: DataSource): Database {
         return Database.connect(dataSource)
