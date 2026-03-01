@@ -106,6 +106,12 @@ function ProtectedRoute() {
   return <Outlet />;
 }
 
+function AdminRoute() {
+  const { user } = useAuth();
+  if (!user?.roles.includes("GLOBAL_ADMIN")) return <Navigate to="/" replace />;
+  return <Outlet />;
+}
+
 function PublicRoute() {
   const { user, loading } = useAuth();
   if (loading) return null;
@@ -129,7 +135,9 @@ createRoot(document.getElementById("root")!).render(
                 <Route path="/" element={<HomeWrapper />} />
                 <Route path="/asset/:assetId" element={<AssetWrapper />} />
                 <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/admin" element={<AdminPage />} />
+                <Route element={<AdminRoute />}>
+                  <Route path="/admin" element={<AdminPage />} />
+                </Route>
               </Route>
             </Route>
           </Routes>
