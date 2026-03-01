@@ -1,6 +1,6 @@
 FROM eclipse-temurin:21-jdk-alpine AS jre-builder
 RUN jlink \
-    --add-modules java.base,java.compiler,java.desktop,java.instrument,java.management,java.naming,java.net.http,java.prefs,java.rmi,java.scripting,java.security.jgss,java.sql,java.xml,jdk.httpserver,jdk.jfr,jdk.unsupported,jdk.crypto.ec \
+    --add-modules java.base,java.compiler,java.desktop,java.instrument,java.management,java.naming,java.net.http,java.prefs,java.rmi,java.scripting,java.security.jgss,java.sql,java.xml,jdk.httpserver,jdk.jfr,jdk.unsupported,jdk.crypto.ec,jdk.zipfs \
     --strip-debug \
     --no-man-pages \
     --no-header-files \

@@ -475,3 +475,11 @@ export async function adminFetchDebugCounts(): Promise<EntityCounts> {
   if (!res.ok) throw new Error(`Failed to fetch counts: ${res.status}`);
   return res.json();
 }
+
+export type SystemInfo = Record<string, string | number | string[] | null>;
+
+export async function adminFetchSystemInfo(): Promise<SystemInfo> {
+  const res = await apiFetch(`${BASE}/admin/debug/system`);
+  if (!res.ok) throw new Error(`Failed to fetch system info: ${res.status}`);
+  return res.json();
+}

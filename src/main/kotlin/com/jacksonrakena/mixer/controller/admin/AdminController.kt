@@ -16,10 +16,14 @@ import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jobrunr.scheduling.JobRequestScheduler
+import org.jobrunr.storage.StorageProvider
+import org.springframework.core.env.Environment
 import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.server.ResponseStatusException
+import java.lang.management.ManagementFactory
+import java.net.InetAddress
 import kotlin.uuid.Uuid
 
 private val logger = KotlinLogging.logger {}
@@ -47,6 +51,8 @@ data class EntityCounts(
 class AdminController(
     private val passwordEncoder: PasswordEncoder,
     private val jobRequestScheduler: JobRequestScheduler,
+    private val storageProvider: StorageProvider,
+    private val environment: Environment,
 ) {
 
     @GetMapping("/users")
@@ -150,6 +156,50 @@ class AdminController(
             jobRequestScheduler.enqueue(RecomputeUserAggregationRequest(uid))
         }
         return mapOf("status" to "queued", "usersEnqueued" to userIds.size)
+    }
+
+    @GetMapping("/debug/system")
+    fun debugSystem(): Map<String, Any?> {
+        val runtime = Runtime.getRuntime()
+        val mxBean = ManagementFactory.getRuntimeMXBean()
+        val memoryBean = ManagementFactory.getMemoryMXBean()
+        val heap = memoryBean.heapMemoryUsage
+        val nonHeap = memoryBean.nonHeapMemoryUsage
+        val osBean = ManagementFactory.getOperatingSystemMXBean()
+
+        val jobStats = storageProvider.jobStats
+
+        return mapOf(
+            "hostname" to InetAddress.getLocalHost().hostName,
+            "ipAddress" to InetAddress.getLocalHost().hostAddress,
+            "javaVersion" to System.getProperty("java.version"),
+            "javaVendor" to System.getProperty("java.vendor"),
+            "jvmName" to mxBean.vmName,
+            "jvmVersion" to mxBean.vmVersion,
+            "kotlinVersion" to KotlinVersion.CURRENT.toString(),
+            "springProfiles" to environment.activeProfiles.toList().ifEmpty { listOf("default") },
+            "osName" to osBean.name,
+            "osVersion" to osBean.version,
+            "osArch" to osBean.arch,
+            "availableProcessors" to osBean.availableProcessors,
+            "systemLoadAverage" to osBean.systemLoadAverage,
+            "heapUsedMb" to heap.used / (1024 * 1024),
+            "heapMaxMb" to heap.max / (1024 * 1024),
+            "nonHeapUsedMb" to nonHeap.used / (1024 * 1024),
+            "uptimeSeconds" to mxBean.uptime / 1000,
+            "startTime" to mxBean.startTime,
+            "pid" to ProcessHandle.current().pid(),
+            "userDir" to System.getProperty("user.dir"),
+            "threadCount" to ManagementFactory.getThreadMXBean().threadCount,
+            "jobsEnqueued" to jobStats.enqueued,
+            "jobsProcessing" to jobStats.processing,
+            "jobsSucceeded" to jobStats.succeeded,
+            "jobsFailed" to jobStats.failed,
+            "jobsScheduled" to jobStats.scheduled,
+            "jobsDeleted" to jobStats.deleted,
+            "jobsRecurring" to jobStats.recurringJobs,
+            "backgroundJobServers" to jobStats.backgroundJobServers,
+        )
     }
 
     @GetMapping("/debug/counts")

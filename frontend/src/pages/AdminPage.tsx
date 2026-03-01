@@ -23,8 +23,10 @@ import {
   adminDeleteUser,
   adminForceReaggregateAll,
   adminFetchDebugCounts,
+  adminFetchSystemInfo,
   type UserResponse,
   type EntityCounts,
+  type SystemInfo,
 } from '../api'
 
 export default function AdminPage() {
@@ -51,6 +53,10 @@ export default function AdminPage() {
   // Debug
   const [counts, setCounts] = useState<EntityCounts | null>(null)
   const [loadingCounts, setLoadingCounts] = useState(false)
+
+  // System info
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null)
+  const [loadingSystem, setLoadingSystem] = useState(false)
 
   const loadUsers = useCallback(() => {
     setLoading(true)
@@ -126,7 +132,18 @@ export default function AdminPage() {
     }
   }
 
-  useEffect(() => { handleLoadCounts() }, [])
+  const handleLoadSystem = async () => {
+    setLoadingSystem(true)
+    try {
+      setSystemInfo(await adminFetchSystemInfo())
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoadingSystem(false)
+    }
+  }
+
+  useEffect(() => { handleLoadCounts(); handleLoadSystem() }, [])
 
   return (
     <Box sx={{ maxWidth: 960, mx: 'auto', py: 4, px: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -308,6 +325,38 @@ export default function AdminPage() {
             ))}
           </Box>
         ) : loadingCounts ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+            <CircularProgress size="sm" />
+          </Box>
+        ) : null}
+      </Sheet>
+
+      {/* ── System Info Section ─────────────────────────────────────────── */}
+      <Sheet variant="outlined" sx={{ borderRadius: '16px', p: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography level="title-md" sx={{ fontWeight: 700 }}>System Information</Typography>
+          <Button size="sm" variant="plain" onClick={handleLoadSystem} loading={loadingSystem}>
+            Refresh
+          </Button>
+        </Box>
+        {systemInfo ? (
+          <Table
+            size="sm"
+            sx={{
+              '& th': { color: 'neutral.600', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', width: '35%' },
+              '& td': { fontSize: '13px', fontFamily: 'monospace' },
+            }}
+          >
+            <tbody>
+              {Object.entries(systemInfo).map(([key, value]) => (
+                <tr key={key}>
+                  <th>{key.replace(/([A-Z])/g, ' $1').trim()}</th>
+                  <td>{Array.isArray(value) ? value.join(', ') : String(value ?? '—')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        ) : loadingSystem ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
             <CircularProgress size="sm" />
           </Box>
