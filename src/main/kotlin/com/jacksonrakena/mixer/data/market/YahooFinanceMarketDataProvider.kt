@@ -9,10 +9,9 @@ import yahoofinance.histquotes.Interval
 import java.util.Calendar
 import java.util.TimeZone
 
-private val logger = KotlinLogging.logger {}
-
 @Component
 class YahooFinanceMarketDataProvider : MarketDataProvider {
+    private val logger = KotlinLogging.logger {}
 
     override fun getHistoricalPrices(
         ticker: String,

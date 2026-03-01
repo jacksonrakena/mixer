@@ -29,6 +29,7 @@ import javax.sql.DataSource
 class MixerApplication {
     @Bean
     fun database(dataSource: DataSource): Database {
+
         return Database.connect(dataSource)
     }
 }

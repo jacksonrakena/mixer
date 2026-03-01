@@ -21,8 +21,6 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 
-private val logger = KotlinLogging.logger {}
-
 @Serializable
 data class BackfillCurrencyPairRequest(val base: String, val counter: String): JobRequest {
     override fun getJobRequestHandler(): Class<out JobRequestHandler<*>?> {
@@ -34,6 +32,8 @@ data class BackfillCurrencyPairRequest(val base: String, val counter: String): J
         val database: Database,
         val currencyService: CurrencyService,
     ) : JobRequestHandler<BackfillCurrencyPairRequest> {
+        private val logger = KotlinLogging.logger {}
+
         override fun run(request: BackfillCurrencyPairRequest?) {
             if (request == null) {
                 logger.warn { "Received null request for BackfillCurrencyPairRequestHandler" }

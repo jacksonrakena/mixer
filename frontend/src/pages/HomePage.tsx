@@ -375,6 +375,8 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
                 xAxis={[{
                   data: xValues,
                   scaleType: 'time',
+                  min: chartRange ? new Date(chartRange.start + 'T00:00:00Z').getTime() : undefined,
+                  max: chartRange ? new Date(chartRange.end + 'T00:00:00Z').getTime() : undefined,
                   valueFormatter: (v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
                 }]}
                 yAxis={[{ width: 70 }]}

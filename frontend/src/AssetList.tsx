@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Box from '@mui/joy/Box'
 import Typography from '@mui/joy/Typography'
 import Button from '@mui/joy/Button'
@@ -11,7 +11,7 @@ import ModalDialog from '@mui/joy/ModalDialog'
 import DialogTitle from '@mui/joy/DialogTitle'
 import DialogContent from '@mui/joy/DialogContent'
 import DialogActions from '@mui/joy/DialogActions'
-import { createAsset, deleteAsset, type AssetDto } from './api'
+import { createAsset, deleteAsset, updateAsset, type AssetDto } from './api'
 
 const POPULAR_CURRENCIES = ['USD', 'NZD', 'AUD', 'EUR', 'GBP', 'BTC', 'ETH']
 
@@ -147,6 +147,79 @@ export const DeleteAssetModal = ({
           </Button>
           <Button color="danger" onClick={handleDelete} loading={deleting}>
             Delete
+          </Button>
+        </DialogActions>
+      </ModalDialog>
+    </Modal>
+  )
+}
+
+/** Modal for editing an asset. */
+export const EditAssetModal = ({
+  asset,
+  onClose,
+  onUpdated,
+}: {
+  asset: AssetDto | null
+  onClose: () => void
+  onUpdated: (updated: AssetDto) => void
+}) => {
+  const [name, setName] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (asset) setName(asset.name)
+  }, [asset])
+
+  const handleSave = async () => {
+    if (!asset) return
+    if (!name.trim()) {
+      setError('Asset name is required.')
+      return
+    }
+    if (name.trim() === asset.name) {
+      onClose()
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      const updated = await updateAsset(asset.id, { name: name.trim() })
+      onUpdated(updated)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update asset')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Modal open={!!asset} onClose={() => !saving && onClose()}>
+      <ModalDialog variant="outlined" sx={{ borderRadius: '16px', maxWidth: 420, width: '100%' }}>
+        <DialogTitle>Edit Asset</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+            <FormControl size="sm">
+              <FormLabel>Name</FormLabel>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+                autoFocus
+              />
+            </FormControl>
+            {error && (
+              <Typography level="body-xs" color="danger">{error}</Typography>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button variant="plain" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} loading={saving} color="primary">
+            Save
           </Button>
         </DialogActions>
       </ModalDialog>

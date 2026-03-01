@@ -11,8 +11,6 @@ import org.slf4j.MDC
 import org.springframework.stereotype.Component
 import kotlin.uuid.Uuid
 
-private val logger = KotlinLogging.logger {}
-
 @Serializable
 class RecomputeUserAggregationRequest(val userId: Uuid) : JobRequest {
     override fun getJobRequestHandler(): Class<out JobRequestHandler<*>?> {
@@ -24,6 +22,8 @@ class RecomputeUserAggregationRequest(val userId: Uuid) : JobRequest {
         val database: Database,
         val userAggregationManager: UserAggregationManager
     ) : JobRequestHandler<RecomputeUserAggregationRequest> {
+        private val logger = KotlinLogging.logger {}
+
         override fun run(request: RecomputeUserAggregationRequest?) {
             if (request == null) {
                 logger.warn { "Received null request for RecomputeUserAggregationRequestHandler" }

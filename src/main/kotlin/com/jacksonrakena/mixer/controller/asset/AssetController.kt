@@ -11,8 +11,10 @@ import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.update
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -21,12 +23,11 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 import kotlin.uuid.toKotlinUuid
 
-private val logger = KotlinLogging.logger {}
-
 @RestController
 @RequestMapping("/asset")
 class AssetController(
 ) {
+    private val logger = KotlinLogging.logger {}
     @GetMapping
     fun getAllAssets(): List<AssetDto> {
         val userId = AuthController.currentUserId()
@@ -62,6 +63,35 @@ class AssetController(
         logger.info { "Created asset $assetId for user $userId" }
 
         return CreateAssetResponse(assetId = assetId)
+    }
+
+    @PatchMapping("/{id}")
+    fun updateAsset(@PathVariable id: UUID, @RequestBody request: UpdateAssetRequest): AssetDto {
+        val userId = AuthController.currentUserId()
+        val assetId = id.toKotlinUuid()
+
+        val asset = transaction {
+            Asset.selectAll().where { (Asset.id eq assetId) and (Asset.ownerId eq userId) }.firstOrNull()
+        } ?: throw org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND)
+
+        transaction {
+            Asset.update({ Asset.id eq assetId }) {
+                if (request.name != null) it[name] = request.name.trim()
+            }
+        }
+
+        logger.info { "Updated asset $assetId" }
+
+        return AssetDto(
+            id = asset[Asset.id],
+            name = request.name?.trim() ?: asset[Asset.name],
+            ownerId = asset[Asset.ownerId],
+            currency = asset[Asset.currency],
+            staleAfter = asset[Asset.staleAfter],
+            aggregatedThrough = asset[Asset.aggregatedThrough]?.toString(),
+            provider = asset[Asset.provider],
+            providerData = asset[Asset.providerData],
+        )
     }
 
     @DeleteMapping("/{id}")

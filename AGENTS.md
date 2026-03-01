@@ -300,3 +300,9 @@ This is the most complex subsystem. Key concepts:
 - Spring Boot 4 removed session auto-configuration — `@EnableJdbcHttpSession` is required, and session tables are managed by Liquibase (changeset `2-spring-session`).
 - Spring Boot 4 modularized autoconfiguration — Liquibase requires both `spring-boot-liquibase` (autoconfigure module) AND `liquibase-core`. Just `liquibase-core` alone won't trigger autoconfiguration.
 - `RecurringTaskScheduler` initial delays prevent race conditions with Exposed DDL creation on startup.
+
+## Coding Conventions
+
+### Kotlin
+- **One class per file.** Every data class, DTO, request/response object must live in its own file. Do not combine multiple classes in a single file unless there is an egregious reason.
+- **Logger must be inside the class.** Declare `private val logger = KotlinLogging.logger {}` as a class member, not as a top-level `private val` outside the class.

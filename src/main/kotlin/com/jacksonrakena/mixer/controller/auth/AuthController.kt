@@ -8,7 +8,6 @@ import com.jacksonrakena.mixer.security.MixerUserDetails
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
-import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
@@ -22,49 +21,15 @@ import org.springframework.security.core.AuthenticationException
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository
-import org.springframework.web.bind.annotation.*
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 import kotlin.uuid.Uuid
-
-private val logger = KotlinLogging.logger {}
-
-@Serializable
-data class SignupRequest(
-    val email: String,
-    val password: String,
-    val displayName: String,
-)
-
-@Serializable
-data class LoginRequest(
-    val email: String,
-    val password: String,
-)
-
-@Serializable
-data class UserResponse(
-    val id: Uuid,
-    val email: String,
-    val displayName: String,
-    val emailVerified: Boolean,
-    val timezone: String,
-    val displayCurrency: String,
-    val roles: List<String>,
-    val createdAt: Long,
-)
-
-@Serializable
-data class UpdateProfileRequest(
-    val displayName: String? = null,
-    val timezone: String? = null,
-    val displayCurrency: String? = null,
-)
-
-@Serializable
-data class ChangePasswordRequest(
-    val currentPassword: String,
-    val newPassword: String,
-)
 
 @RestController
 @RequestMapping("/auth")
@@ -74,6 +39,7 @@ class AuthController(
     private val jobRequestScheduler: JobRequestScheduler,
     private val mixerConfiguration: MixerConfiguration,
 ) {
+    private val logger = KotlinLogging.logger {}
     private val securityContextRepository = HttpSessionSecurityContextRepository()
 
     @PostMapping("/signup")

@@ -128,6 +128,26 @@ export async function deleteAsset(
   return res.json();
 }
 
+export async function renameAsset(
+  assetId: string,
+  name: string,
+): Promise<AssetDto> {
+  return updateAsset(assetId, { name });
+}
+
+export async function updateAsset(
+  assetId: string,
+  updates: { name?: string },
+): Promise<AssetDto> {
+  const res = await apiFetch(`${BASE}/asset/${assetId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) throw new Error(`Failed to update asset: ${res.status}`);
+  return res.json();
+}
+
 // ── Transactions ─────────────────────────────────────────────────────────────
 
 export async function createTransaction(

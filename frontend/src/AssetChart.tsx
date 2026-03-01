@@ -403,6 +403,7 @@ interface AssetChartProps {
   staleAfter: number; // epoch millis, 0 = not stale
   aggregatedThrough: string | null; // ISO date or null if never aggregated
   displayCurrency?: string;
+  headerAction?: React.ReactNode;
 }
 
 type DateRange = "7d" | "30d" | "90d" | "1y" | "all";
@@ -491,6 +492,7 @@ export const AssetChart = ({
   staleAfter: initialStaleAfter,
   aggregatedThrough: initialAggregatedThrough,
   displayCurrency: displayCurrencyOverride,
+  headerAction,
 }: AssetChartProps) => {
   const [data, setData] = useState<AssetAggregation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -717,12 +719,15 @@ export const AssetChart = ({
           }}
         >
           <Box>
-            <Typography
-              level="title-lg"
-              sx={{ fontWeight: 700 }}
-            >
-              {assetName}
-            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography
+                level="title-lg"
+                sx={{ fontWeight: 700 }}
+              >
+                {assetName}
+              </Typography>
+              {headerAction}
+            </Box>
             <Box
               sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}
             >
@@ -907,6 +912,8 @@ export const AssetChart = ({
                 {
                   data: xValues,
                   scaleType: "time",
+                  min: chartRange ? new Date(chartRange.start + "T00:00:00Z").getTime() : undefined,
+                  max: chartRange ? new Date(chartRange.end + "T00:00:00Z").getTime() : undefined,
                   valueFormatter: (v) =>
                     new Date(v).toLocaleDateString("en-US", {
                       month: "short",
@@ -919,6 +926,7 @@ export const AssetChart = ({
                 tooltip: { trigger: "none" },
                 axisHighlight: { x: "none", y: "none" },
               }}
+              hideLegend
               sx={{
                 "& .MuiLineElement-root": { strokeWidth: 2 },
                 "& .MuiAreaElement-root": { fillOpacity: 0.12 },

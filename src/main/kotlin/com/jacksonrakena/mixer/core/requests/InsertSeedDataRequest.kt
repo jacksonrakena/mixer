@@ -22,8 +22,6 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-private val logger = KotlinLogging.logger {}
-
 private data class SeedAsset(val ref: String, val name: String, val currency: String)
 private data class SeedTransaction(val assetRef: String, val daysAgo: Int, val type: AssetTransactionType, val amount: Double, val value: Double)
 
@@ -39,6 +37,7 @@ class InsertSeedDataRequest: JobRequest {
         val jobRequestScheduler: JobRequestScheduler,
         val passwordEncoder: PasswordEncoder,
     ) : JobRequestHandler<InsertSeedDataRequest> {
+        private val logger = KotlinLogging.logger {}
         private fun loadCsv(path: String): List<List<String>> {
             val stream = this::class.java.getResourceAsStream(path)
                 ?: throw IllegalStateException("Seed data file not found: $path")

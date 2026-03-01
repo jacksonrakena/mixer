@@ -10,7 +10,6 @@ import com.jacksonrakena.mixer.data.tables.concrete.User
 import com.jacksonrakena.mixer.data.tables.virtual.AssetAggregate
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.LocalDate
-import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.greaterEq
@@ -26,30 +25,12 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 import kotlin.uuid.Uuid
 
-private val logger = KotlinLogging.logger {}
-
-@Serializable
-data class PortfolioAggregationPoint(
-    val date: String,
-    val totalValue: Double,
-    val displayCurrency: String,
-    val assetCount: Int,
-    val assetBreakdown: List<PortfolioAssetValue>,
-)
-
-@Serializable
-data class PortfolioAssetValue(
-    val assetId: String,
-    val assetName: String,
-    val nativeCurrency: String,
-    val value: Double,
-)
-
 @RestController
 @RequestMapping("/agg")
 class AggregateController(
     val exchangeRateHelper: ExchangeRateHelper,
 ) {
+    private val logger = KotlinLogging.logger {}
 
     @GetMapping("/asset/{id}/{start}/{end}")
     fun getAggregateValue(

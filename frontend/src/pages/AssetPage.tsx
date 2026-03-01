@@ -1,24 +1,34 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import Box from '@mui/joy/Box'
 import Typography from '@mui/joy/Typography'
 import Sheet from '@mui/joy/Sheet'
 import CircularProgress from '@mui/joy/CircularProgress'
+import IconButton from '@mui/joy/IconButton'
+import Dropdown from '@mui/joy/Dropdown'
+import Menu from '@mui/joy/Menu'
+import MenuButton from '@mui/joy/MenuButton'
+import MenuItem from '@mui/joy/MenuItem'
 import { type AssetDto, type SupportedCurrency } from '../api'
 import { AssetChart } from '../AssetChart'
 import { TransactionPanel } from '../TransactionPanel'
+import { DeleteAssetModal, EditAssetModal } from '../AssetList'
 
 interface AssetPageProps {
   displayCurrency: SupportedCurrency
   assets: AssetDto[]
+  refreshAssets: () => Promise<AssetDto[]>
 }
 
-export default function AssetPage({ displayCurrency, assets: propAssets }: AssetPageProps) {
+export default function AssetPage({ displayCurrency, assets: propAssets, refreshAssets }: AssetPageProps) {
   const { assetId } = useParams<{ assetId: string }>()
+  const navigate = useNavigate()
   const [asset, setAsset] = useState<AssetDto | null>(null)
   const [loading, setLoading] = useState(true)
   const [staleAfter, setStaleAfter] = useState(0)
   const [aggregatedThrough, setAggregatedThrough] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<AssetDto | null>(null)
+  const [editTarget, setEditTarget] = useState<AssetDto | null>(null)
 
   useEffect(() => {
     if (!assetId) return
@@ -63,6 +73,17 @@ export default function AssetPage({ displayCurrency, assets: propAssets }: Asset
         staleAfter={staleAfter}
         aggregatedThrough={aggregatedThrough}
         displayCurrency={displayCurrency}
+        headerAction={
+          <Dropdown>
+            <MenuButton slots={{ root: IconButton }} slotProps={{ root: { variant: 'outlined', color: 'neutral', size: 'sm' } }}>
+              ⋯
+            </MenuButton>
+            <Menu placement="bottom-end" size="sm">
+              <MenuItem onClick={() => setEditTarget(asset)}>Edit</MenuItem>
+              <MenuItem color="danger" onClick={() => setDeleteTarget(asset)}>Delete</MenuItem>
+            </Menu>
+          </Dropdown>
+        }
       />
 
       {/* Transactions panel */}
@@ -94,6 +115,27 @@ export default function AssetPage({ displayCurrency, assets: propAssets }: Asset
           onTransactionChange={handleTransactionChange}
         />
       </Sheet>
+
+      {/* Edit modal */}
+      <EditAssetModal
+        asset={editTarget}
+        onClose={() => setEditTarget(null)}
+        onUpdated={() => {
+          setEditTarget(null)
+          refreshAssets()
+        }}
+      />
+
+      {/* Delete modal */}
+      <DeleteAssetModal
+        asset={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onDeleted={() => {
+          setDeleteTarget(null)
+          refreshAssets()
+          navigate('/')
+        }}
+      />
     </Box>
   )
 }

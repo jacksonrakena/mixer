@@ -40,8 +40,8 @@ function HomeWrapper() {
 }
 
 function AssetWrapper() {
-  const { displayCurrency, assets } = useAppContext();
-  return <AssetPage displayCurrency={displayCurrency} assets={assets} />;
+  const { displayCurrency, assets, refreshAssets } = useAppContext();
+  return <AssetPage displayCurrency={displayCurrency} assets={assets} refreshAssets={refreshAssets} />;
 }
 
 const theme = extendTheme({

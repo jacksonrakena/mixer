@@ -9,7 +9,6 @@ import com.jacksonrakena.mixer.data.tables.concrete.UserRole
 import com.jacksonrakena.mixer.data.tables.virtual.AssetAggregate
 import com.jacksonrakena.mixer.data.tables.markets.ExchangeRate
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
@@ -26,26 +25,6 @@ import java.lang.management.ManagementFactory
 import java.net.InetAddress
 import kotlin.uuid.Uuid
 
-private val logger = KotlinLogging.logger {}
-
-@Serializable
-data class AdminCreateUserRequest(
-    val email: String,
-    val password: String,
-    val displayName: String,
-    val emailVerified: Boolean = false,
-)
-
-@Serializable
-data class EntityCounts(
-    val users: Long,
-    val assets: Long,
-    val transactions: Long,
-    val aggregates: Long,
-    val exchangeRates: Long,
-    val userRoles: Long,
-)
-
 @RestController
 @RequestMapping("/admin")
 class AdminController(
@@ -54,6 +33,7 @@ class AdminController(
     private val storageProvider: StorageProvider,
     private val environment: Environment,
 ) {
+    private val logger = KotlinLogging.logger {}
 
     @GetMapping("/users")
     fun listUsers(): List<UserResponse> {

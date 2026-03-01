@@ -1,6 +1,5 @@
 package com.jacksonrakena.mixer.upstream.oanda
 
-import com.fasterxml.jackson.annotation.JsonProperty
 import com.jacksonrakena.mixer.MixerApplication
 import com.jacksonrakena.mixer.MixerConfiguration
 import com.jacksonrakena.mixer.upstream.CurrencyRangeResponse
@@ -13,37 +12,11 @@ import org.springframework.web.client.RestClient
 import java.time.Instant
 import java.time.ZoneId
 
-private val logger = KotlinLogging.logger {}
-
-data class OandaResponse(
-    val instrument: String,
-    val granularity: String,
-    val candles: List<Candlestick>
-)
-
-data class Candlestick(
-    val time: Instant,
-    val mid: CandlestickValue
-)
-
-data class CandlestickValue(
-    @JsonProperty("h")
-    val high: Double,
-
-    @JsonProperty("l")
-    val low: Double,
-
-    @JsonProperty("c")
-    val close: Double,
-
-    @JsonProperty("o")
-    val open: Double,
-)
-
 @Component
 @ConditionalOnProperty("mixer.currency.provider", havingValue = "oanda")
 class OandaCurrencyService(val app: MixerApplication, val client: RestClient, val config: MixerConfiguration) :
     CurrencyService {
+    private val logger = KotlinLogging.logger {}
 
     override fun getHistoricExchangeRates(pair: Pair<String, String>, from: java.time.ZonedDateTime?): CurrencyRangeResponse {
         val end = Instant.now().atZone(ZoneId.systemDefault())

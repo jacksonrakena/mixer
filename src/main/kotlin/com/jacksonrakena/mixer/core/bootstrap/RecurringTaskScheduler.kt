@@ -9,14 +9,13 @@ import org.jobrunr.scheduling.JobRequestScheduler
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 
-private val logger = KotlinLogging.logger {}
-
 @Component
 class RecurringTaskScheduler(
     private val userAggregationManager: UserAggregationManager,
     private val jobRequestScheduler: JobRequestScheduler,
     private val config: MixerConfiguration,
 ) {
+    private val logger = KotlinLogging.logger {}
     companion object {
         fun currencyPairs(currencies: List<String>): List<Pair<String, String>> {
             return currencies.mapIndexed { index, currency ->

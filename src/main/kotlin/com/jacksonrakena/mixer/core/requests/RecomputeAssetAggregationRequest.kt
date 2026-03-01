@@ -16,8 +16,6 @@ import org.slf4j.MDC
 import org.springframework.stereotype.Component
 import kotlin.uuid.Uuid
 
-private val logger = KotlinLogging.logger {}
-
 @Serializable
 class RecomputeAssetAggregationRequest(
     val assetId: Uuid,
@@ -31,6 +29,8 @@ class RecomputeAssetAggregationRequest(
     class RecomputeAssetAggregationRequestHandler(
         val userAggregationManager: UserAggregationManager
     ) : JobRequestHandler<RecomputeAssetAggregationRequest> {
+        private val logger = KotlinLogging.logger {}
+
         override fun run(request: RecomputeAssetAggregationRequest?) {
             if (request == null) {
                 logger.warn { "Received null request for RecomputeAssetAggregationRequestHandler" }

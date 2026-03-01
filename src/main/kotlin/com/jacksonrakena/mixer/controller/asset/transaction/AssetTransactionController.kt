@@ -23,13 +23,12 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 import kotlin.uuid.toKotlinUuid
 
-private val logger = KotlinLogging.logger {}
-
 @RestController
 @RequestMapping("/asset/{assetId}/transaction")
 class AssetTransactionController(
     val scheduler: JobRequestScheduler
 ) {
+    private val logger = KotlinLogging.logger {}
 
     @GetMapping
     fun listTransactions(
