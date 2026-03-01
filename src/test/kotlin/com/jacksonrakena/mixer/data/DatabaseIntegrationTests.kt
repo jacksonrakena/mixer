@@ -1,6 +1,4 @@
-package com.jacksonrakena.mixer
-
-import com.jacksonrakena.mixer.data.AggregationService
+package com.jacksonrakena.mixer.data
 import com.jacksonrakena.mixer.data.AssetTransactionType
 import com.jacksonrakena.mixer.data.UserAggregationManager
 import com.jacksonrakena.mixer.data.market.MarketDataProvider

@@ -1,6 +1,4 @@
-package com.jacksonrakena.mixer
-
-import com.jacksonrakena.mixer.data.ExchangeRateHelper
+package com.jacksonrakena.mixer.data
 import com.jacksonrakena.mixer.data.ExchangeRateHelper.Companion.FALLBACK_WINDOW_DAYS
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import com.jacksonrakena.mixer.data.tables.concrete.User

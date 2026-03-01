@@ -38,7 +38,7 @@ dependencies {
     implementation("org.jobrunr:jobrunr-spring-boot-4-starter:_")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:_")
     implementation("io.github.oshai:kotlin-logging-jvm:_")
-    implementation("com.yahoofinance-api:YahooFinanceAPI:_")
+
     implementation("org.jetbrains.kotlin:kotlin-reflect:_")
     implementation("org.jetbrains.exposed:exposed-kotlin-datetime:_")
     implementation(Spring.boot.security)
