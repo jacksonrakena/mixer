@@ -364,6 +364,7 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
               })()}
 
               <LineChart
+                hideLegend
                 height={CHART_HEIGHT}
                 series={[{
                   data: yValues,
