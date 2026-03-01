@@ -9,6 +9,7 @@ import CircularProgress from '@mui/joy/CircularProgress'
 import Alert from '@mui/joy/Alert'
 import { LineChart } from '@mui/x-charts/LineChart'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../AuthContext'
 import {
   fetchPortfolioAggregation,
   fetchAllPortfolioAggregation,
@@ -78,6 +79,7 @@ interface HomePageProps {
 
 export default function HomePage({ displayCurrency, assets: propAssets, refreshAssets }: HomePageProps) {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [data, setData] = useState<PortfolioAggregationPoint[]>([])
   const [assets, setAssets] = useState<AssetDto[]>(propAssets)
   const [loading, setLoading] = useState(true)
@@ -147,6 +149,7 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
   }, [isStale, loadData])
 
   const currentValue = data.length > 0 ? data[data.length - 1].totalValue : null
+  const latestDate = data.length > 0 ? new Date(data[data.length - 1].date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : null
   const firstValue = data.length > 0 ? data[0].totalValue : null
   const change = currentValue !== null && firstValue !== null && firstValue !== 0
     ? ((currentValue - firstValue) / firstValue) * 100
@@ -208,21 +211,24 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
 
   return (
     <Box sx={{ maxWidth: 1100, mx: 'auto', width: '100%' }}>
-      {/* Hero stat */}
+      {/* Greeting + portfolio value */}
       <Box sx={{ mb: 3 }}>
-        <Typography level="body-sm" sx={{ color: 'neutral.500', mb: 0.5 }}>
-          Total Portfolio Value
+        <Typography level="h3" sx={{ fontWeight: 700, mb: 1.5 }}>
+          {user ? `Hello, ${user.displayName.split(' ')[0]}` : 'Hello'}
+        </Typography>
+        <Typography level="body-sm" sx={{ color: 'neutral.500', mb: 0.25 }}>
+          Total Portfolio Value{latestDate && ` as of ${latestDate}`}
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 2, flexWrap: 'wrap' }}>
           {currentValue !== null ? (
-            <Typography level="h2" sx={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+            <Typography level="h4" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
               {currentValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-              <Typography component="span" level="body-md" sx={{ color: 'neutral.500', ml: 1 }}>
+              <Typography component="span" level="body-sm" sx={{ color: 'neutral.500', ml: 0.75 }}>
                 {displayCurrency}
               </Typography>
             </Typography>
           ) : (
-            <Typography level="h2" sx={{ color: 'neutral.400' }}>—</Typography>
+            <Typography level="h4" sx={{ color: 'neutral.400' }}>—</Typography>
           )}
           {change !== null && absChange !== null && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
