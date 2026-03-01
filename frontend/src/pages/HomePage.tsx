@@ -42,19 +42,21 @@ function fillDateRange(
   const result: PortfolioAggregationPoint[] = []
   const cursor = new Date(startIso + 'T00:00:00Z')
   const end = new Date(endIso + 'T00:00:00Z')
-  let lastValue = data.length > 0 ? data[0].totalValue : 0
-  let lastCurrency = data.length > 0 ? data[0].displayCurrency : ''
-  let lastBreakdown = data.length > 0 ? data[0].assetBreakdown : []
+  let lastValue = 0
+  let lastCurrency = ''
+  let lastBreakdown: PortfolioAggregationPoint['assetBreakdown'] = []
+  let hasSeenData = false
 
   while (cursor <= end) {
     const key = cursor.toISOString().slice(0, 10)
     const existing = byDate.get(key)
     if (existing) {
+      hasSeenData = true
       lastValue = existing.totalValue
       lastCurrency = existing.displayCurrency
       lastBreakdown = existing.assetBreakdown
       result.push(existing)
-    } else {
+    } else if (hasSeenData) {
       result.push({
         date: key,
         totalValue: lastValue,

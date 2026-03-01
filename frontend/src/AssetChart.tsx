@@ -435,19 +435,22 @@ function fillDateRange(
   const result: AssetAggregation[] = [];
   const cursor = new Date(startIso + "T00:00:00Z");
   const end = new Date(endIso + "T00:00:00Z");
-  let lastDisplayValue = data.length > 0 ? getDisplayValue(data[0]) : 0;
-  let lastNativeValue = data.length > 0 ? data[0].nativeValue : 0;
-  let lastAmount = data.length > 0 ? data[0].amount : 0;
-  let lastNativeCurrency = data.length > 0 ? data[0].nativeCurrency : null;
-  let lastDisplayCurrency = data.length > 0 ? data[0].displayCurrency : null;
-  let lastFxConversion = data.length > 0 ? data[0].fxConversion : null;
-  let lastUnitPrice = data.length > 0 ? data[0].unitPrice : null;
-  let lastValueDate = data.length > 0 ? data[0].valueDate : null;
+  // Initialize carry-forward values to zero; only fill forward after the first real data point
+  let lastDisplayValue = 0;
+  let lastNativeValue = 0;
+  let lastAmount = 0;
+  let lastNativeCurrency: string | null = null;
+  let lastDisplayCurrency: string | null = null;
+  let lastFxConversion: AssetAggregation["fxConversion"] = null;
+  let lastUnitPrice: number | null = null;
+  let lastValueDate: string | null = null;
+  let hasSeenData = false;
 
   while (cursor <= end) {
     const key = cursor.toISOString().slice(0, 10);
     const existing = byDate.get(key);
     if (existing) {
+      hasSeenData = true;
       lastDisplayValue = getDisplayValue(existing);
       lastNativeValue = existing.nativeValue;
       lastAmount = existing.amount;
@@ -457,7 +460,7 @@ function fillDateRange(
       lastUnitPrice = existing.unitPrice;
       lastValueDate = existing.valueDate;
       result.push(existing);
-    } else {
+    } else if (hasSeenData) {
       result.push({
         assetId: data[0]?.assetId ?? "",
         date: cursor.toISOString(),
