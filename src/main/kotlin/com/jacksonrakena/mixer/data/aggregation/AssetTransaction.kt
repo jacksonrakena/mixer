@@ -1,4 +1,4 @@
-package com.jacksonrakena.mixer.data
+package com.jacksonrakena.mixer.data.aggregation
 
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant

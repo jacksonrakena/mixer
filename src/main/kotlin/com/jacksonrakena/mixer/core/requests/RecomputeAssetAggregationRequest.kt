@@ -1,6 +1,6 @@
 package com.jacksonrakena.mixer.core.requests
 
-import com.jacksonrakena.mixer.data.AssetAggregationOrchestrator
+import com.jacksonrakena.mixer.data.aggregation.AssetAggregationOrchestrator
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import com.jacksonrakena.mixer.data.tables.concrete.User
 import io.github.oshai.kotlinlogging.KotlinLogging

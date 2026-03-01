@@ -1,4 +1,4 @@
-package com.jacksonrakena.mixer.data
+package com.jacksonrakena.mixer.data.aggregation
 
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import com.jacksonrakena.mixer.data.tables.concrete.User

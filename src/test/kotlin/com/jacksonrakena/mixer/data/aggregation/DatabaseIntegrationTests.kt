@@ -1,10 +1,10 @@
-package com.jacksonrakena.mixer.data
-import com.jacksonrakena.mixer.data.AssetTransactionType
-import com.jacksonrakena.mixer.data.AggregationService
-import com.jacksonrakena.mixer.data.AggregateRepository
-import com.jacksonrakena.mixer.data.AssetAggregationOrchestrator
-import com.jacksonrakena.mixer.data.DatabaseAssetTransactionSource
-import com.jacksonrakena.mixer.data.MarketPriceResolver
+package com.jacksonrakena.mixer.data.aggregation
+import com.jacksonrakena.mixer.data.aggregation.AssetTransactionType
+import com.jacksonrakena.mixer.data.aggregation.AggregationService
+import com.jacksonrakena.mixer.data.aggregation.AggregateRepository
+import com.jacksonrakena.mixer.data.aggregation.AssetAggregationOrchestrator
+import com.jacksonrakena.mixer.data.aggregation.DatabaseAssetTransactionSource
+import com.jacksonrakena.mixer.data.aggregation.MarketPriceResolver
 import com.jacksonrakena.mixer.data.market.MarketDataProvider
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import com.jacksonrakena.mixer.data.tables.concrete.Transaction

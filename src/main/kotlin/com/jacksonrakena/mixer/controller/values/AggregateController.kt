@@ -1,10 +1,10 @@
 package com.jacksonrakena.mixer.controller.values
 
 import com.jacksonrakena.mixer.controller.auth.AuthController
-import com.jacksonrakena.mixer.data.AggregationPeriod
-import com.jacksonrakena.mixer.data.AssetTransactionAggregation
-import com.jacksonrakena.mixer.data.ExchangeRateHelper
-import com.jacksonrakena.mixer.data.FxConversionInfo
+import com.jacksonrakena.mixer.data.aggregation.AggregationPeriod
+import com.jacksonrakena.mixer.data.aggregation.AssetTransactionAggregation
+import com.jacksonrakena.mixer.data.fx.ExchangeRateHelper
+import com.jacksonrakena.mixer.data.fx.FxConversionInfo
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import com.jacksonrakena.mixer.data.tables.concrete.User
 import com.jacksonrakena.mixer.data.tables.virtual.AssetAggregate

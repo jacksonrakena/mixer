@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import useMediaQuery from '@mui/material/useMediaQuery'
 import Box from '@mui/joy/Box'
 import Typography from '@mui/joy/Typography'
 import Button from '@mui/joy/Button'
@@ -78,6 +79,7 @@ function paginationRange(current: number, total: number): (number | 'ellipsis')[
 
 export const TransactionPanel = ({ assetId, currency, onTransactionChange }: TransactionPanelProps) => {
   const { user } = useAuth()
+  const isMobile = useMediaQuery('(max-width:600px)')
   const tz = user?.timezone
   const [type, setType] = useState<TransactionType>('Trade')
   const [amount, setAmount] = useState('')
@@ -237,7 +239,7 @@ export const TransactionPanel = ({ assetId, currency, onTransactionChange }: Tra
                 sx={{
                   tableLayout: 'auto',
                   width: '100%',
-                  '--TableCell-paddingX': '10px',
+                  '--TableCell-paddingX': isMobile ? '6px' : '10px',
                   '--TableCell-paddingY': '6px',
                   '& thead th': { color: 'neutral.500', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' },
                   '& tbody tr': { cursor: 'pointer' },
@@ -248,7 +250,7 @@ export const TransactionPanel = ({ assetId, currency, onTransactionChange }: Tra
                   <tr>
                     <th>Type</th>
                     <th style={{ textAlign: 'right' }}>Amount</th>
-                    <th style={{ textAlign: 'right' }}>Unit Price</th>
+                    {!isMobile && <th style={{ textAlign: 'right' }}>Unit Price</th>}
                     <th style={{ textAlign: 'right' }}>Total Value</th>
                   </tr>
                 </thead>
@@ -292,6 +294,7 @@ export const TransactionPanel = ({ assetId, currency, onTransactionChange }: Tra
                           <Typography level="body-xs" sx={{ color: 'neutral.400' }}>—</Typography>
                         )}
                       </td>
+                      {!isMobile && (
                       <td style={{ textAlign: 'right' }}>
                         {unitPrice != null ? (
                           <Box>
@@ -306,6 +309,7 @@ export const TransactionPanel = ({ assetId, currency, onTransactionChange }: Tra
                           <Typography level="body-xs" sx={{ color: 'neutral.400' }}>—</Typography>
                         )}
                       </td>
+                      )}
                       <td style={{ textAlign: 'right' }}>
                         {tx.value != null ? (
                           <Box>

@@ -2,7 +2,7 @@ package com.jacksonrakena.mixer.core.bootstrap
 
 import com.jacksonrakena.mixer.MixerConfiguration
 import com.jacksonrakena.mixer.core.requests.BackfillCurrencyPairRequest
-import com.jacksonrakena.mixer.data.AssetAggregationOrchestrator
+import com.jacksonrakena.mixer.data.aggregation.AssetAggregationOrchestrator
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import org.jobrunr.scheduling.JobRequestScheduler

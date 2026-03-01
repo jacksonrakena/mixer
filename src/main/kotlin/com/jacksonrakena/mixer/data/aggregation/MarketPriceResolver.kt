@@ -1,4 +1,4 @@
-package com.jacksonrakena.mixer.data
+package com.jacksonrakena.mixer.data.aggregation
 
 import com.jacksonrakena.mixer.data.market.MarketDataProvider
 import io.github.oshai.kotlinlogging.KotlinLogging

@@ -1,6 +1,6 @@
 package com.jacksonrakena.mixer.controller.asset.transaction
 
-import com.jacksonrakena.mixer.data.AssetTransactionType
+import com.jacksonrakena.mixer.data.aggregation.AssetTransactionType
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 

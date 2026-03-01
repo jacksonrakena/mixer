@@ -1,4 +1,4 @@
-package com.jacksonrakena.mixer.data
+package com.jacksonrakena.mixer.data.fx
 
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable

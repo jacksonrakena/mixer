@@ -1,9 +1,9 @@
 package com.jacksonrakena.mixer.performance
 
-import com.jacksonrakena.mixer.data.AggregationService
-import com.jacksonrakena.mixer.data.AssetTransaction
-import com.jacksonrakena.mixer.data.AssetTransactionSource
-import com.jacksonrakena.mixer.data.AssetTransactionType
+import com.jacksonrakena.mixer.data.aggregation.AggregationService
+import com.jacksonrakena.mixer.data.aggregation.AssetTransaction
+import com.jacksonrakena.mixer.data.aggregation.AssetTransactionSource
+import com.jacksonrakena.mixer.data.aggregation.AssetTransactionType
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone

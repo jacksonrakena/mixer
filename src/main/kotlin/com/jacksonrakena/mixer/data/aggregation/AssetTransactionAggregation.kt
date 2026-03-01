@@ -1,4 +1,6 @@
-package com.jacksonrakena.mixer.data
+package com.jacksonrakena.mixer.data.aggregation
+
+import com.jacksonrakena.mixer.data.fx.FxConversionInfo
 
 import com.jacksonrakena.mixer.data.tables.virtual.AssetAggregate
 import kotlinx.datetime.TimeZone

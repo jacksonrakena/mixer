@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import Box from '@mui/joy/Box'
 import Typography from '@mui/joy/Typography'
 import Sheet from '@mui/joy/Sheet'
@@ -7,7 +7,6 @@ import CardContent from '@mui/joy/CardContent'
 import Chip from '@mui/joy/Chip'
 import CircularProgress from '@mui/joy/CircularProgress'
 import Alert from '@mui/joy/Alert'
-import { LineChart } from '@mui/x-charts/LineChart'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../AuthContext'
 import {
@@ -19,16 +18,8 @@ import {
   type AssetDto,
   type SupportedCurrency,
 } from '../api'
-
-type DateRange = '7d' | '30d' | '90d' | '1y' | 'all'
-
-const DATE_RANGES: { label: string; value: DateRange; days?: number }[] = [
-  { label: '7D', value: '7d', days: 7 },
-  { label: '30D', value: '30d', days: 30 },
-  { label: '90D', value: '90d', days: 90 },
-  { label: '1Y', value: '1y', days: 365 },
-  { label: 'All', value: 'all' },
-]
+import { InteractiveChart, type DragInfo } from '../components/InteractiveChart'
+import { DateRangeSelector, DATE_RANGES, type DateRange } from '../components/DateRangeSelector'
 
 const CHART_HEIGHT = 340
 
@@ -85,15 +76,7 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [range, setRange] = useState<DateRange>('30d')
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  // Tooltip state
-  const [tooltipIndex, setTooltipIndex] = useState<number | null>(null)
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
-
-  // Drag-to-compare state
-  const [dragStartIndex, setDragStartIndex] = useState<number | null>(null)
-  const [isDragging, setIsDragging] = useState(false)
+  const [dragInfo, setDragInfo] = useState<DragInfo | null>(null)
 
   const chartRange = useMemo(() => {
     if (range === 'all') return null
@@ -167,139 +150,26 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
   // Latest breakdown for the asset cards
   const latestBreakdown = data.length > 0 ? data[data.length - 1].assetBreakdown : []
 
-  // Tooltip mouse/touch handling
-  const getLinePointXPositions = useCallback((): number[] | null => {
-    const container = containerRef.current
-    if (!container) return null
-    const path = container.querySelector<SVGPathElement>('.MuiLineElement-root')
-    if (!path) return null
-    const d = path.getAttribute('d')
-    if (!d) return null
-    const positions: number[] = []
-    const re = /([MLC])\s*([-\d.e]+)[,\s]([-\d.e]+)(?:[,\s]([-\d.e]+)[,\s]([-\d.e]+)[,\s]([-\d.e]+)[,\s]([-\d.e]+))?/gi
-    let match: RegExpExecArray | null
-    while ((match = re.exec(d)) !== null) {
-      const cmd = match[1].toUpperCase()
-      if (cmd === 'M' || cmd === 'L') positions.push(parseFloat(match[2]))
-      else if (cmd === 'C') positions.push(parseFloat(match[6]))
-    }
-    return positions.length > 0 ? positions : null
-  }, [data])
-
-  const findClosestIndex = useCallback(
-    (clientX: number): number | null => {
-      const container = containerRef.current
-      if (!container || data.length === 0) return null
-      const rect = container.getBoundingClientRect()
-      const mouseX = clientX - rect.left
-      const xPositions = getLinePointXPositions()
-      if (!xPositions || xPositions.length === 0) return null
-      const firstX = xPositions[0]
-      const lastX = xPositions[xPositions.length - 1]
-      if (mouseX < firstX - 5 || mouseX > lastX + 5) return null
-      let closestIdx = 0, closestDist = Math.abs(mouseX - xPositions[0])
-      for (let i = 1; i < xPositions.length; i++) {
-        const dist = Math.abs(mouseX - xPositions[i])
-        if (dist < closestDist) { closestDist = dist; closestIdx = i }
-      }
-      return closestIdx
-    },
-    [data, getLinePointXPositions],
-  )
-
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const container = containerRef.current
-    if (!container || data.length === 0) return
-    const rect = container.getBoundingClientRect()
-    const mouseX = e.clientX - rect.left
-    const mouseY = e.clientY - rect.top
-    const idx = findClosestIndex(e.clientX)
-    if (idx === null) { if (!isDragging) setTooltipIndex(null); return }
-    setTooltipIndex(idx)
-    setMousePos({ x: mouseX, y: mouseY })
-  }, [data, findClosestIndex, isDragging])
-
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const idx = findClosestIndex(e.clientX)
-    if (idx !== null) { setDragStartIndex(idx); setIsDragging(true) }
-  }, [findClosestIndex])
-
-  const handleMouseUp = useCallback(() => {
-    setDragStartIndex(null); setIsDragging(false)
-  }, [])
-
-  const handleMouseLeave = useCallback(() => {
-    setTooltipIndex(null); setDragStartIndex(null); setIsDragging(false)
-  }, [])
-
-  const handleTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-    if (e.touches.length === 0) return
-    const touch = e.touches[0]
-    const container = containerRef.current
-    if (!container || data.length === 0) return
-    const rect = container.getBoundingClientRect()
-    const touchX = touch.clientX - rect.left
-    const touchY = touch.clientY - rect.top
-    const idx = findClosestIndex(touch.clientX)
-    if (idx === null) { if (!isDragging) setTooltipIndex(null); return }
-    setTooltipIndex(idx)
-    setMousePos({ x: touchX, y: touchY })
-    if (!isDragging) { setDragStartIndex(idx); setIsDragging(true) }
-  }, [data, findClosestIndex, isDragging])
-
-  const handleTouchEnd = useCallback(() => {
-    setTooltipIndex(null); setDragStartIndex(null); setIsDragging(false)
-  }, [])
-
-  const crosshairX = useMemo(() => {
-    if (tooltipIndex === null) return null
-    const xPositions = getLinePointXPositions()
-    if (!xPositions || tooltipIndex >= xPositions.length) return null
-    return xPositions[tooltipIndex]
-  }, [tooltipIndex, data, getLinePointXPositions])
-
-  // Drag-to-compare computed values
-  const dragInfo = useMemo(() => {
-    if (!isDragging || dragStartIndex === null || tooltipIndex === null || data.length === 0) return null
-    const startIdx = Math.min(dragStartIndex, tooltipIndex)
-    const endIdx = Math.max(dragStartIndex, tooltipIndex)
-    if (startIdx === endIdx) return null
-    const startVal = data[startIdx].totalValue
-    const endVal = data[endIdx].totalValue
-    const absChange = endVal - startVal
-    const pctChange = startVal !== 0 ? (absChange / startVal) * 100 : null
-    const startDate = new Date(data[startIdx].date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-    const endDate = new Date(data[endIdx].date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-    return { startVal, endVal, absChange, pctChange, startDate, endDate }
-  }, [isDragging, dragStartIndex, tooltipIndex, data])
-
-  const dragStartX = useMemo(() => {
-    if (dragStartIndex === null || data.length === 0) return null
-    const xPositions = getLinePointXPositions()
-    if (!xPositions || dragStartIndex >= xPositions.length) return null
-    return xPositions[dragStartIndex]
-  }, [dragStartIndex, data, getLinePointXPositions])
-
   return (
     <Box sx={{ maxWidth: 1100, mx: 'auto', width: '100%' }}>
       {/* Greeting + portfolio value */}
-      <Box sx={{ mb: 3 }}>
-        <Typography level="h3" sx={{ fontWeight: 700, mb: 1.5 }}>
+      <Box sx={{ mb: { xs: 2, sm: 3 } }}>
+        <Typography level="h3" sx={{ fontWeight: 700, mb: 1, fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
           {user ? `Hello, ${user.displayName.split(' ')[0]}` : 'Hello'}
         </Typography>
         <Typography level="body-sm" sx={{ color: 'neutral.500', mb: 0.25 }}>
-          Total Portfolio Value{latestDate && ` as of ${latestDate}`}
+          Total portfolio value{latestDate && ` as of ${latestDate}`}
         </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 2, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
           {dragInfo ? (
             <>
-              <Typography level="h4" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+              <Typography level="h4" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
                 {dragInfo.endVal.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                 <Typography component="span" level="body-sm" sx={{ color: 'neutral.500', ml: 0.75 }}>
                   {displayCurrency}
                 </Typography>
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                 {dragInfo.pctChange !== null && (
                   <Chip size="sm" variant="soft" color={dragInfo.absChange >= 0 ? 'success' : 'danger'} sx={{ fontWeight: 600 }}>
                     {dragInfo.absChange >= 0 ? '+' : ''}{dragInfo.pctChange.toFixed(2)}%
@@ -316,7 +186,7 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
           ) : (
             <>
               {currentValue !== null ? (
-                <Typography level="h4" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                <Typography level="h4" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
                   {currentValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                   <Typography component="span" level="body-sm" sx={{ color: 'neutral.500', ml: 0.75 }}>
                     {displayCurrency}
@@ -326,7 +196,7 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
                 <Typography level="h4" sx={{ color: 'neutral.400' }}>—</Typography>
               )}
               {change !== null && absChange !== null && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                   <Chip size="sm" variant="soft" color={isPositive ? 'success' : 'danger'} sx={{ fontWeight: 600 }}>
                     {isPositive ? '+' : ''}{change.toFixed(2)}%
                   </Chip>
@@ -344,27 +214,11 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
       </Box>
 
       {/* Main chart card */}
-      <Card variant="outlined" sx={{ borderRadius: '16px', mb: 3 }}>
-        <CardContent>
+      <Card variant="outlined" sx={{ borderRadius: { xs: '12px', md: '16px' }, mb: 3 }}>
+        <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
           {/* Range selector */}
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
-            <Box sx={{ display: 'flex', gap: 0.5 }}>
-              {DATE_RANGES.map((r) => (
-                <Box
-                  key={r.value}
-                  onClick={() => setRange(r.value)}
-                  sx={{
-                    px: 1.5, py: 0.5, borderRadius: '8px', cursor: 'pointer',
-                    fontSize: '12px', fontWeight: 600, transition: 'all 0.15s',
-                    bgcolor: range === r.value ? 'primary.100' : 'transparent',
-                    color: range === r.value ? 'primary.700' : 'neutral.500',
-                    '&:hover': { bgcolor: 'primary.50', color: 'primary.700' },
-                  }}
-                >
-                  {r.label}
-                </Box>
-              ))}
-            </Box>
+            <DateRangeSelector value={range} onChange={setRange} />
           </Box>
 
           {/* Chart */}
@@ -382,83 +236,55 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
               </Typography>
             </Box>
           ) : (
-            <Box
-              ref={containerRef}
-              onMouseMove={handleMouseMove}
-              onMouseDown={handleMouseDown}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseLeave}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-              sx={{ position: 'relative', cursor: isStale ? 'default' : 'crosshair', touchAction: 'none' }}
-            >
-              {/* Stale data overlay */}
-              {isStale && (
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    inset: 0,
-                    zIndex: 10,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: 'rgba(255, 255, 255, 0.85)',
-                    backdropFilter: 'blur(4px)',
-                    borderRadius: '8px',
-                    gap: 1.5,
-                  }}
-                >
-                  <CircularProgress
-                    size="md"
-                    sx={{ '--CircularProgress-trackColor': 'var(--joy-palette-primary-100)' }}
-                  />
-                  <Typography level="body-sm" sx={{ color: 'neutral.700', fontWeight: 600 }}>
-                    Recalculating…
-                  </Typography>
-                  <Typography level="body-xs" sx={{ color: 'neutral.500', textAlign: 'center', maxWidth: 260 }}>
-                    Portfolio data is being processed. The chart will update automatically.
-                  </Typography>
-                </Box>
-              )}
-              {/* Crosshair */}
-              {!isStale && tooltipIndex !== null && crosshairX !== null && (
-                <Box sx={{
-                  position: 'absolute', top: 10, bottom: 30, left: crosshairX,
-                  width: '1px', background: 'rgba(0,0,0,0.15)', pointerEvents: 'none', zIndex: 15,
-                }} />
-              )}
-
-              {/* Drag start crosshair */}
-              {!isStale && isDragging && dragStartX !== null && (
-                <Box sx={{
-                  position: 'absolute', top: 10, bottom: 30, left: dragStartX,
-                  width: '1px', background: 'rgba(0,0,0,0.15)', pointerEvents: 'none', zIndex: 15,
-                }} />
-              )}
-
-              {/* Drag selection highlight */}
-              {!isStale && isDragging && dragStartX !== null && crosshairX !== null && dragStartX !== crosshairX && (
-                <Box sx={{
-                  position: 'absolute', top: 10, bottom: 30,
-                  left: Math.min(dragStartX, crosshairX),
-                  width: Math.abs(crosshairX - dragStartX),
-                  background: 'rgba(0, 150, 136, 0.08)',
-                  pointerEvents: 'none', zIndex: 14,
-                }} />
-              )}
-
-              {/* Tooltip (hidden during drag) */}
-              {!isStale && !isDragging && tooltipIndex !== null && data[tooltipIndex] && (() => {
-                const point = data[tooltipIndex]
-                const containerWidth = containerRef.current?.getBoundingClientRect().width ?? 600
+            <InteractiveChart
+              xValues={xValues}
+              yValues={yValues}
+              currency={displayCurrency}
+              label="Portfolio"
+              chartRange={chartRange}
+              disabled={isStale}
+              height={CHART_HEIGHT}
+              onDragChange={setDragInfo}
+              renderOverlay={() =>
+                isStale ? (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      inset: 0,
+                      zIndex: 10,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'rgba(255, 255, 255, 0.85)',
+                      backdropFilter: 'blur(4px)',
+                      borderRadius: '8px',
+                      gap: 1.5,
+                    }}
+                  >
+                    <CircularProgress
+                      size="md"
+                      sx={{ '--CircularProgress-trackColor': 'var(--joy-palette-primary-100)' }}
+                    />
+                    <Typography level="body-sm" sx={{ color: 'neutral.700', fontWeight: 600 }}>
+                      Recalculating…
+                    </Typography>
+                    <Typography level="body-xs" sx={{ color: 'neutral.500', textAlign: 'center', maxWidth: 260 }}>
+                      Portfolio data is being processed. The chart will update automatically.
+                    </Typography>
+                  </Box>
+                ) : null
+              }
+              renderTooltip={(index, x, y, containerWidth) => {
+                const point = data[index]
+                if (!point) return null
                 const tooltipWidth = 280
-                const flipX = (crosshairX ?? mousePos.x) + tooltipWidth + 20 > containerWidth
+                const flipX = x + tooltipWidth + 20 > containerWidth
                 return (
                   <Box sx={{
-                    position: 'absolute', top: Math.max(mousePos.y - 20, 0),
-                    left: flipX ? undefined : (crosshairX ?? mousePos.x) + 14,
-                    right: flipX ? containerWidth - (crosshairX ?? mousePos.x) + 14 : undefined,
+                    position: 'absolute', top: Math.max(y - 20, 0),
+                    left: flipX ? undefined : x + 14,
+                    right: flipX ? containerWidth - x + 14 : undefined,
                     zIndex: 20, pointerEvents: 'none', minWidth: tooltipWidth,
                     background: 'rgba(255,255,255,0.97)', border: '1px solid rgba(0,0,0,0.1)',
                     borderRadius: '10px', backdropFilter: 'blur(16px)',
@@ -487,37 +313,8 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
                     )}
                   </Box>
                 )
-              })()}
-
-              <LineChart
-                hideLegend
-                height={CHART_HEIGHT}
-                series={[{
-                  data: yValues,
-                  label: 'Portfolio',
-                  color: 'var(--joy-palette-primary-500)',
-                  showMark: false,
-                  area: true,
-                }]}
-                xAxis={[{
-                  data: xValues,
-                  scaleType: 'time',
-                  min: chartRange ? new Date(chartRange.start + 'T00:00:00Z').getTime() : undefined,
-                  max: chartRange ? new Date(chartRange.end + 'T00:00:00Z').getTime() : undefined,
-                  valueFormatter: (v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                }]}
-                yAxis={[{ width: 70 }]}
-                slotProps={{ tooltip: { trigger: 'none' }, axisHighlight: { x: 'none', y: 'none' }, legend: { hidden: true } }}
-                sx={{
-                  '& .MuiLineElement-root': { strokeWidth: 2 },
-                  '& .MuiAreaElement-root': { fillOpacity: 0.1 },
-                  '& .MuiChartsAxis-line, & .MuiChartsAxis-tick': { stroke: 'rgba(0,0,0,0.12)' },
-                  '& .MuiChartsAxis-tickLabel': { fill: 'rgba(0,0,0,0.45)', fontSize: '11px' },
-                  '& .MuiChartsAxis-label': { fill: 'rgba(0,0,0,0.45)' },
-                  '& .MuiChartsAxisHighlight-root': { display: 'none' },
-                }}
-              />
-            </Box>
+              }}
+            />
           )}
         </CardContent>
       </Card>
@@ -537,7 +334,7 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
                   key={asset.assetId}
                   variant="outlined"
                   sx={{
-                    borderRadius: '12px', p: 2, cursor: 'pointer',
+                    borderRadius: '12px', p: { xs: 1.5, sm: 2 }, cursor: 'pointer',
                     transition: 'all 0.15s',
                     '&:hover': { borderColor: 'primary.300', bgcolor: 'primary.50' },
                   }}

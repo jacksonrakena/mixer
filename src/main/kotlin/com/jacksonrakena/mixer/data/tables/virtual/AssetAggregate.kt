@@ -1,6 +1,6 @@
 package com.jacksonrakena.mixer.data.tables.virtual
 
-import com.jacksonrakena.mixer.data.AggregationPeriod
+import com.jacksonrakena.mixer.data.aggregation.AggregationPeriod
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.datetime.date

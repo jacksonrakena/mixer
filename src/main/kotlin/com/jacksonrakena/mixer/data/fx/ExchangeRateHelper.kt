@@ -1,4 +1,4 @@
-package com.jacksonrakena.mixer.data
+package com.jacksonrakena.mixer.data.fx
 
 import com.jacksonrakena.mixer.data.tables.markets.ExchangeRate
 import kotlinx.datetime.DateTimeUnit

@@ -1,6 +1,6 @@
 package com.jacksonrakena.mixer.core.requests
 
-import com.jacksonrakena.mixer.data.AssetTransactionType
+import com.jacksonrakena.mixer.data.aggregation.AssetTransactionType
 import com.jacksonrakena.mixer.data.tables.concrete.Asset
 import com.jacksonrakena.mixer.data.tables.concrete.Transaction
 import com.jacksonrakena.mixer.data.tables.concrete.User

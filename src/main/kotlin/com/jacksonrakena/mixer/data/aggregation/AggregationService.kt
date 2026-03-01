@@ -1,4 +1,4 @@
-package com.jacksonrakena.mixer.data
+package com.jacksonrakena.mixer.data.aggregation
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.LocalDate

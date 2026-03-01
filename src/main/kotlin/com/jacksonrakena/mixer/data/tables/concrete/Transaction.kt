@@ -1,6 +1,6 @@
 package com.jacksonrakena.mixer.data.tables.concrete
 
-import com.jacksonrakena.mixer.data.AssetTransactionType
+import com.jacksonrakena.mixer.data.aggregation.AssetTransactionType
 import org.jetbrains.exposed.v1.core.Table
 import kotlin.uuid.ExperimentalUuidApi
 

@@ -92,8 +92,8 @@ export default function AssetPage({ displayCurrency, assets: propAssets, refresh
       <Sheet
         variant="outlined"
         sx={{
-          borderRadius: '16px',
-          p: 2.5,
+          borderRadius: { xs: '12px', md: '16px' },
+          p: { xs: 1.5, sm: 2.5 },
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',

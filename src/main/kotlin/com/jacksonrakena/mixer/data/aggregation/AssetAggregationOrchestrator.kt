@@ -1,4 +1,4 @@
-package com.jacksonrakena.mixer.data
+package com.jacksonrakena.mixer.data.aggregation
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.LocalDate
@@ -15,7 +15,7 @@ class AssetAggregationOrchestrator(
     private val aggregationService: AggregationService,
     private val aggregateRepository: AggregateRepository,
     private val marketPriceResolver: MarketPriceResolver,
-    private val transactionSource: DatabaseAssetTransactionSource,
+    private val transactionSource: AssetTransactionSource,
 ) {
     private val logger = KotlinLogging.logger {}
 

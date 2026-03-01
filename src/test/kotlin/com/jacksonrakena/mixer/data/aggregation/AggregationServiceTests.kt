@@ -1,8 +1,8 @@
-package com.jacksonrakena.mixer.data
-import com.jacksonrakena.mixer.data.AssetTransaction
-import com.jacksonrakena.mixer.data.AssetTransactionAggregation
-import com.jacksonrakena.mixer.data.AssetTransactionSource
-import com.jacksonrakena.mixer.data.AssetTransactionType
+package com.jacksonrakena.mixer.data.aggregation
+import com.jacksonrakena.mixer.data.aggregation.AssetTransaction
+import com.jacksonrakena.mixer.data.aggregation.AssetTransactionAggregation
+import com.jacksonrakena.mixer.data.aggregation.AssetTransactionSource
+import com.jacksonrakena.mixer.data.aggregation.AssetTransactionType
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.doubles.shouldBeExactly
 import io.kotest.matchers.shouldBe

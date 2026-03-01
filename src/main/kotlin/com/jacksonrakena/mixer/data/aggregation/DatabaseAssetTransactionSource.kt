@@ -1,4 +1,4 @@
-package com.jacksonrakena.mixer.data
+package com.jacksonrakena.mixer.data.aggregation
 
 import com.jacksonrakena.mixer.data.tables.concrete.Transaction
 import org.jetbrains.exposed.v1.core.SortOrder
