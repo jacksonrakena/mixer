@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.RestController
 class ConfigController(private val config: MixerConfiguration) {
     @GetMapping
     fun getConfig(): ClientConfigResponse {
-        return ClientConfigResponse(currencies = config.fx.currencies)
+        return ClientConfigResponse(
+            currencies = config.fx.currencies,
+            enabledMarketSources = config.markets.sources.enabled,
+        )
     }
 }

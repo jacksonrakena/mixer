@@ -19,6 +19,7 @@ data class MixerConfiguration(
     val fx: FxConfiguration = FxConfiguration(),
     val data: DataConfiguration = DataConfiguration(),
     val user: UserConfiguration = UserConfiguration(),
+    val markets: MarketsConfiguration = MarketsConfiguration(),
 ) {
     @Bean
     fun restClient(): RestClient = RestClient.create()
@@ -59,6 +60,15 @@ data class UserConfiguration(
 data class SignupConfiguration(
     val enabled: Boolean = true,
 )
+
+data class MarketsConfiguration(
+    val sources: MarketSourcesConfiguration = MarketSourcesConfiguration(),
+)
+
+data class MarketSourcesConfiguration(
+    val enabled: List<String> = emptyList(),
+)
+
 @Configuration
 class SerializationConfiguration {
 

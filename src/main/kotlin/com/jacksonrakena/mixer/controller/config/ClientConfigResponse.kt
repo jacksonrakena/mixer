@@ -5,4 +5,5 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ClientConfigResponse(
     val currencies: List<String>,
+    val enabledMarketSources: List<String>,
 )

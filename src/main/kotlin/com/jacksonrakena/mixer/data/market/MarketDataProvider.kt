@@ -15,4 +15,10 @@ interface MarketDataProvider {
         startDate: LocalDate,
         endDate: LocalDate,
     ): Map<LocalDate, Double>
+
+    /**
+     * Validates that the given ticker code is recognized by this provider.
+     * Returns true if the ticker is valid, false otherwise.
+     */
+    fun validateTicker(ticker: String): Boolean
 }

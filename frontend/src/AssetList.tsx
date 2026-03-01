@@ -11,22 +11,45 @@ import ModalDialog from '@mui/joy/ModalDialog'
 import DialogTitle from '@mui/joy/DialogTitle'
 import DialogContent from '@mui/joy/DialogContent'
 import DialogActions from '@mui/joy/DialogActions'
+import Select from '@mui/joy/Select'
+import Option from '@mui/joy/Option'
 import { createAsset, deleteAsset, updateAsset, type AssetDto } from './api'
 
 const POPULAR_CURRENCIES = ['USD', 'NZD', 'AUD', 'EUR', 'GBP', 'BTC', 'ETH']
+
+type DataSource = 'USER' | 'YFIN'
+
+const DATA_SOURCE_LABELS: Record<DataSource, string> = {
+  USER: 'None',
+  YFIN: 'Yahoo! Finance',
+}
+
+function parseTickerCode(providerData: string | null | undefined): string {
+  if (!providerData) return ''
+  try {
+    const parsed = JSON.parse(providerData)
+    return parsed.tickerCode ?? ''
+  } catch {
+    return ''
+  }
+}
 
 /** Modal for creating a new asset. */
 export const CreateAssetModal = ({
   open,
   onClose,
   onCreated,
+  enabledMarketSources = [],
 }: {
   open: boolean
   onClose: () => void
   onCreated: (asset: AssetDto) => void
+  enabledMarketSources?: string[]
 }) => {
   const [name, setName] = useState('')
   const [currency, setCurrency] = useState('USD')
+  const [dataSource, setDataSource] = useState<DataSource>('USER')
+  const [tickerCode, setTickerCode] = useState('')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -35,13 +58,26 @@ export const CreateAssetModal = ({
       setError('Asset name is required.')
       return
     }
+    if (dataSource === 'YFIN' && !tickerCode.trim()) {
+      setError('Ticker code is required for Yahoo! Finance assets.')
+      return
+    }
     setCreating(true)
     setError(null)
     try {
-      const res = await createAsset({ name: name.trim(), currency })
-      const newAsset: AssetDto = { id: res.assetId, name: name.trim(), ownerId: '', currency, staleAfter: 0 }
+      const provider = dataSource
+      const providerData = dataSource === 'YFIN'
+        ? JSON.stringify({ tickerCode: tickerCode.trim().toUpperCase() })
+        : null
+      const res = await createAsset({ name: name.trim(), currency, provider, providerData })
+      const newAsset: AssetDto = {
+        id: res.assetId, name: name.trim(), ownerId: '', currency,
+        staleAfter: 0, aggregatedThrough: null, provider, providerData,
+      }
       setName('')
       setCurrency('USD')
+      setDataSource('USER')
+      setTickerCode('')
       onCreated(newAsset)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create asset')
@@ -88,6 +124,29 @@ export const CreateAssetModal = ({
                 ))}
               </Box>
             </FormControl>
+            <FormControl size="sm">
+              <FormLabel>Data Source</FormLabel>
+              <Select
+                value={dataSource}
+                onChange={(_, val) => val && setDataSource(val as DataSource)}
+              >
+                <Option value="USER">{DATA_SOURCE_LABELS.USER}</Option>
+                {enabledMarketSources.includes('yfin') && (
+                  <Option value="YFIN">{DATA_SOURCE_LABELS.YFIN}</Option>
+                )}
+              </Select>
+            </FormControl>
+            {dataSource === 'YFIN' && (
+              <FormControl size="sm">
+                <FormLabel>Ticker Code</FormLabel>
+                <Input
+                  value={tickerCode}
+                  onChange={(e) => setTickerCode(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                  placeholder="e.g. AAPL"
+                />
+              </FormControl>
+            )}
             {error && (
               <Typography level="body-xs" color="danger">{error}</Typography>
             )}
@@ -159,17 +218,25 @@ export const EditAssetModal = ({
   asset,
   onClose,
   onUpdated,
+  enabledMarketSources = [],
 }: {
   asset: AssetDto | null
   onClose: () => void
   onUpdated: (updated: AssetDto) => void
+  enabledMarketSources?: string[]
 }) => {
   const [name, setName] = useState('')
+  const [dataSource, setDataSource] = useState<DataSource>('USER')
+  const [tickerCode, setTickerCode] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (asset) setName(asset.name)
+    if (asset) {
+      setName(asset.name)
+      setDataSource((asset.provider ?? 'USER') as DataSource)
+      setTickerCode(parseTickerCode(asset.providerData))
+    }
   }, [asset])
 
   const handleSave = async () => {
@@ -178,14 +245,33 @@ export const EditAssetModal = ({
       setError('Asset name is required.')
       return
     }
-    if (name.trim() === asset.name) {
+    if (dataSource === 'YFIN' && !tickerCode.trim()) {
+      setError('Ticker code is required for Yahoo! Finance assets.')
+      return
+    }
+
+    const newProvider = dataSource
+    const newProviderData = dataSource === 'YFIN'
+      ? JSON.stringify({ tickerCode: tickerCode.trim().toUpperCase() })
+      : null
+
+    const nameChanged = name.trim() !== asset.name
+    const providerChanged = newProvider !== (asset.provider ?? 'USER')
+    const providerDataChanged = newProviderData !== asset.providerData
+
+    if (!nameChanged && !providerChanged && !providerDataChanged) {
       onClose()
       return
     }
+
     setSaving(true)
     setError(null)
     try {
-      const updated = await updateAsset(asset.id, { name: name.trim() })
+      const updates: { name?: string; provider?: string; providerData?: string | null } = {}
+      if (nameChanged) updates.name = name.trim()
+      if (providerChanged) updates.provider = newProvider
+      if (providerChanged || providerDataChanged) updates.providerData = newProviderData
+      const updated = await updateAsset(asset.id, updates)
       onUpdated(updated)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to update asset')
@@ -209,6 +295,29 @@ export const EditAssetModal = ({
                 autoFocus
               />
             </FormControl>
+            <FormControl size="sm">
+              <FormLabel>Data Source</FormLabel>
+              <Select
+                value={dataSource}
+                onChange={(_, val) => val && setDataSource(val as DataSource)}
+              >
+                <Option value="USER">{DATA_SOURCE_LABELS.USER}</Option>
+                {enabledMarketSources.includes('yfin') && (
+                  <Option value="YFIN">{DATA_SOURCE_LABELS.YFIN}</Option>
+                )}
+              </Select>
+            </FormControl>
+            {dataSource === 'YFIN' && (
+              <FormControl size="sm">
+                <FormLabel>Ticker Code</FormLabel>
+                <Input
+                  value={tickerCode}
+                  onChange={(e) => setTickerCode(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+                  placeholder="e.g. AAPL"
+                />
+              </FormControl>
+            )}
             {error && (
               <Typography level="body-xs" color="danger">{error}</Typography>
             )}

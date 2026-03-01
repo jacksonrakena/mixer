@@ -2,7 +2,6 @@ package com.jacksonrakena.mixer.data.market.yahoo
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.http.HttpHeaders
-import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import java.net.HttpCookie
 import java.net.URI
@@ -20,7 +19,6 @@ import kotlin.concurrent.withLock
  *   2. GET https://query1.finance.yahoo.com/v1/test/getcrumb with cookie → receive crumb text
  *   3. Append crumb as query parameter to all subsequent API requests
  */
-@Component
 open class YahooFinanceClient {
     private val logger = KotlinLogging.logger {}
 

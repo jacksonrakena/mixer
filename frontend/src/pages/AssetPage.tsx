@@ -18,9 +18,10 @@ interface AssetPageProps {
   displayCurrency: SupportedCurrency
   assets: AssetDto[]
   refreshAssets: () => Promise<AssetDto[]>
+  enabledMarketSources: string[]
 }
 
-export default function AssetPage({ displayCurrency, assets: propAssets, refreshAssets }: AssetPageProps) {
+export default function AssetPage({ displayCurrency, assets: propAssets, refreshAssets, enabledMarketSources }: AssetPageProps) {
   const { assetId } = useParams<{ assetId: string }>()
   const navigate = useNavigate()
   const [asset, setAsset] = useState<AssetDto | null>(null)
@@ -120,6 +121,7 @@ export default function AssetPage({ displayCurrency, assets: propAssets, refresh
       <EditAssetModal
         asset={editTarget}
         onClose={() => setEditTarget(null)}
+        enabledMarketSources={enabledMarketSources}
         onUpdated={() => {
           setEditTarget(null)
           refreshAssets()

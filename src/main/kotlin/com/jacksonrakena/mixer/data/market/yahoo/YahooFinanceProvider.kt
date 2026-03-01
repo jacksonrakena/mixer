@@ -7,7 +7,6 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
-import org.springframework.stereotype.Component
 
 /**
  * MarketDataProvider implementation backed by Yahoo Finance's v8 chart API.
@@ -22,7 +21,6 @@ import org.springframework.stereotype.Component
  *   4. Parse JSON response, extract timestamps + close prices
  *   5. Convert timestamps to LocalDate, return Map<LocalDate, Double>
  */
-@Component
 class YahooFinanceProvider(
     private val client: YahooFinanceClient,
 ) : MarketDataProvider {
@@ -134,5 +132,26 @@ class YahooFinanceProvider(
     @Suppress("DEPRECATION")
     private fun kotlinx.datetime.Instant.toLocalDate(tz: TimeZone): LocalDate {
         return this.toLocalDateTime(tz).date
+    }
+
+    override fun validateTicker(ticker: String): Boolean {
+        val upperTicker = ticker.uppercase()
+        logger.debug { "$upperTicker: Validating ticker" }
+
+        val url = "${YahooFinanceClient.BASE_URL}/v8/finance/chart/$upperTicker"
+        val params = mapOf(
+            "range" to "1d",
+            "interval" to "1d",
+        )
+
+        return try {
+            val responseBody = client.get(url, params)
+            val envelope = json.decodeFromString<YahooChartEnvelope>(responseBody)
+            val chart = envelope.chart
+            chart.error == null && !chart.result.isNullOrEmpty()
+        } catch (e: Exception) {
+            logger.debug(e) { "$upperTicker: Ticker validation failed" }
+            false
+        }
     }
 }

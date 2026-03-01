@@ -30,11 +30,15 @@ export interface AssetDto {
   currency: string;
   staleAfter: number; // epoch millis, 0 = not stale
   aggregatedThrough: string | null; // ISO date or null if never aggregated
+  provider: string; // "USER" or "YFIN"
+  providerData: string | null; // JSON string, e.g. {"tickerCode":"AAPL"}
 }
 
 export interface CreateAssetRequest {
   name: string;
   currency: string;
+  provider?: string;
+  providerData?: string | null;
 }
 
 export interface CreateAssetResponse {
@@ -116,7 +120,10 @@ export async function createAsset(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
   });
-  if (!res.ok) throw new Error(`Failed to create asset: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.message ?? `Failed to create asset: ${res.status}`);
+  }
   return res.json();
 }
 
@@ -137,14 +144,17 @@ export async function renameAsset(
 
 export async function updateAsset(
   assetId: string,
-  updates: { name?: string },
+  updates: { name?: string; provider?: string; providerData?: string | null },
 ): Promise<AssetDto> {
   const res = await apiFetch(`${BASE}/asset/${assetId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(updates),
   });
-  if (!res.ok) throw new Error(`Failed to update asset: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.message ?? `Failed to update asset: ${res.status}`);
+  }
   return res.json();
 }
 
@@ -288,6 +298,7 @@ export async function fetchAllPortfolioAggregation(
 
 export interface ClientConfig {
   currencies: string[];
+  enabledMarketSources: string[];
 }
 
 let _configCache: ClientConfig | null = null;

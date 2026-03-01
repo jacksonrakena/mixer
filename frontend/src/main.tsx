@@ -28,6 +28,7 @@ interface AppContext {
   assets: AssetDto[];
   loadingAssets: boolean;
   refreshAssets: () => Promise<AssetDto[]>;
+  enabledMarketSources: string[];
 }
 
 export function useAppContext() {
@@ -40,8 +41,8 @@ function HomeWrapper() {
 }
 
 function AssetWrapper() {
-  const { displayCurrency, assets, refreshAssets } = useAppContext();
-  return <AssetPage displayCurrency={displayCurrency} assets={assets} refreshAssets={refreshAssets} />;
+  const { displayCurrency, assets, refreshAssets, enabledMarketSources } = useAppContext();
+  return <AssetPage displayCurrency={displayCurrency} assets={assets} refreshAssets={refreshAssets} enabledMarketSources={enabledMarketSources} />;
 }
 
 const theme = extendTheme({

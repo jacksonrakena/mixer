@@ -30,6 +30,7 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [currencies, setCurrencies] = useState<string[]>([])
+  const [enabledMarketSources, setEnabledMarketSources] = useState<string[]>([])
   const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
@@ -38,7 +39,10 @@ export default function App() {
       .catch(console.error)
       .finally(() => setLoadingAssets(false))
     fetchConfig()
-      .then((cfg) => setCurrencies(cfg.currencies))
+      .then((cfg) => {
+        setCurrencies(cfg.currencies)
+        setEnabledMarketSources(cfg.enabledMarketSources)
+      })
       .catch(console.error)
   }, [])
 
@@ -376,13 +380,14 @@ export default function App() {
           width: '100%',
         }}
       >
-        <Outlet context={{ displayCurrency, assets, loadingAssets, refreshAssets: () => fetchAssets().then((a) => { setAssets(a); return a; }) }} />
+        <Outlet context={{ displayCurrency, assets, loadingAssets, enabledMarketSources, refreshAssets: () => fetchAssets().then((a) => { setAssets(a); return a; }) }} />
       </Box>
 
       {/* Create asset modal */}
       <CreateAssetModal
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
+        enabledMarketSources={enabledMarketSources}
         onCreated={(asset) => {
           setAssets((prev) => [...prev, asset])
           setCreateModalOpen(false)
