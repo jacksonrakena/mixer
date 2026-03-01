@@ -353,3 +353,32 @@ databaseChangeLog:
             tableName: SPRING_SESSION_ATTRIBUTES
             columnNames: SESSION_PRIMARY_ID, ATTRIBUTE_NAME
             constraintName: pk_spring_session_attributes
+
+  - changeSet:
+      id: 3-fix-session-attribute-bytes-type
+      author: mixer
+      preConditions:
+        - onFail: MARK_RAN
+        - dbms:
+            type: postgresql
+      changes:
+        - sql:
+            sql: >
+              ALTER TABLE SPRING_SESSION_ATTRIBUTES
+              ADD COLUMN attribute_bytes_new BYTEA;
+        - sql:
+            sql: >
+              UPDATE SPRING_SESSION_ATTRIBUTES
+              SET attribute_bytes_new = lo_get(ATTRIBUTE_BYTES);
+        - sql:
+            sql: >
+              ALTER TABLE SPRING_SESSION_ATTRIBUTES
+              DROP COLUMN ATTRIBUTE_BYTES;
+        - sql:
+            sql: >
+              ALTER TABLE SPRING_SESSION_ATTRIBUTES
+              RENAME COLUMN attribute_bytes_new TO ATTRIBUTE_BYTES;
+        - sql:
+            sql: >
+              ALTER TABLE SPRING_SESSION_ATTRIBUTES
+              ALTER COLUMN ATTRIBUTE_BYTES SET NOT NULL;
