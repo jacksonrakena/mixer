@@ -27,7 +27,6 @@ private val logger = KotlinLogging.logger {}
 @RequestMapping("/asset")
 class AssetController(
 ) {
-
     @GetMapping
     fun getAllAssets(): List<AssetDto> {
         val userId = AuthController.currentUserId()

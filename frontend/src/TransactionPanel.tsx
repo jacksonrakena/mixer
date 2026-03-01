@@ -30,6 +30,7 @@ import { useAuth } from './AuthContext'
 
 interface TransactionPanelProps {
   assetId: string
+  currency: string
   onTransactionChange: (staleAfter: number) => void
 }
 
@@ -43,15 +44,13 @@ function formatDate(epochMs: number, tz?: string) {
   })
 }
 
-function formatDateTime(epochMs: number, tz?: string) {
-  return new Date(epochMs).toLocaleString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
+function formatTime(epochMs: number, tz?: string) {
+  return new Date(epochMs).toLocaleTimeString('en-US', {
     hour: 'numeric', minute: '2-digit',
     timeZone: tz,
     timeZoneName: 'short',
   })
 }
-
 function formatFullDateTime(epochMs: number, tz?: string) {
   return new Date(epochMs).toLocaleString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
@@ -77,7 +76,7 @@ function paginationRange(current: number, total: number): (number | 'ellipsis')[
   return result
 }
 
-export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPanelProps) => {
+export const TransactionPanel = ({ assetId, currency, onTransactionChange }: TransactionPanelProps) => {
   const { user } = useAuth()
   const tz = user?.timezone
   const [type, setType] = useState<TransactionType>('Trade')
@@ -249,36 +248,58 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
                   <tr>
                     <th>Type</th>
                     <th style={{ textAlign: 'right' }}>Amount</th>
-                    <th style={{ textAlign: 'right' }}>Value</th>
                     <th style={{ textAlign: 'right' }}>Unit Price</th>
-                    <th style={{ textAlign: 'right' }}>Date & Time</th>
+                    <th style={{ textAlign: 'right' }}>Total Value</th>
                   </tr>
                 </thead>
                 <tbody>
                   {transactions.map((tx) => {
+                    const isReconciliation = tx.type === 'Reconciliation'
                     const unitPrice = tx.amount != null && tx.value != null && tx.amount !== 0
                       ? tx.value / Math.abs(tx.amount)
                       : null
                     return (
                     <tr key={tx.id} onClick={() => setSelectedTx(tx)}>
                       <td>
-                        <Chip
-                          size="sm"
-                          variant="soft"
-                          color={tx.type === 'Trade' ? 'primary' : 'neutral'}
-                          sx={{ fontSize: '10px' }}
-                        >
-                          {tx.type}
-                        </Chip>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                          <Chip
+                            size="sm"
+                            variant="soft"
+                            color={isReconciliation ? 'neutral' : 'primary'}
+                            sx={{ fontSize: '10px', width: 'fit-content' }}
+                          >
+                            {tx.type}
+                          </Chip>
+                          <Typography level="body-xs" sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                            {formatDate(tx.timestamp, tz)}
+                          </Typography>
+                          <Typography level="body-xs" sx={{ color: 'neutral.500', fontSize: '10px', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                            {formatTime(tx.timestamp, tz)}
+                          </Typography>
+                        </Box>
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         {tx.amount != null ? (
+                          <Typography level="body-xs" sx={{
+                            color: isReconciliation ? 'neutral.600' : (tx.amount >= 0 ? '#059669' : '#dc2626'),
+                            fontWeight: 600,
+                            fontVariantNumeric: 'tabular-nums',
+                          }}>
+                            {isReconciliation ? '→ ' : (tx.amount >= 0 ? '+' : '')}
+                            {tx.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                          </Typography>
+                        ) : (
+                          <Typography level="body-xs" sx={{ color: 'neutral.400' }}>—</Typography>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {unitPrice != null ? (
                           <Box>
-                            <Typography level="body-xs" sx={{ color: tx.amount >= 0 ? '#059669' : '#dc2626', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                              {tx.amount >= 0 ? '+' : ''}{tx.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                            <Typography level="body-xs" sx={{ color: 'neutral.600', fontVariantNumeric: 'tabular-nums' }}>
+                              ${unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                             </Typography>
                             <Typography level="body-xs" sx={{ color: 'neutral.400', fontSize: '10px' }}>
-                              units
+                              {currency}
                             </Typography>
                           </Box>
                         ) : (
@@ -287,26 +308,17 @@ export const TransactionPanel = ({ assetId, onTransactionChange }: TransactionPa
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         {tx.value != null ? (
-                          <Typography level="body-xs" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                            ${tx.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </Typography>
+                          <Box>
+                            <Typography level="body-xs" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                              ${tx.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </Typography>
+                            <Typography level="body-xs" sx={{ color: 'neutral.400', fontSize: '10px' }}>
+                              {currency}
+                            </Typography>
+                          </Box>
                         ) : (
                           <Typography level="body-xs" sx={{ color: 'neutral.400' }}>—</Typography>
                         )}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        {unitPrice != null ? (
-                          <Typography level="body-xs" sx={{ color: 'neutral.600', fontVariantNumeric: 'tabular-nums' }}>
-                            ${unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
-                          </Typography>
-                        ) : (
-                          <Typography level="body-xs" sx={{ color: 'neutral.400' }}>—</Typography>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <Typography level="body-xs" sx={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                          {formatDateTime(tx.timestamp, tz)}
-                        </Typography>
                       </td>
                     </tr>
                     )

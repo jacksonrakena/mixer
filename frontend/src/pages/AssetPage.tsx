@@ -90,6 +90,7 @@ export default function AssetPage({ displayCurrency, assets: propAssets }: Asset
         </Typography>
         <TransactionPanel
           assetId={asset.id}
+          currency={asset.currency}
           onTransactionChange={handleTransactionChange}
         />
       </Sheet>
