@@ -31,13 +31,13 @@ data class CurrencyConfiguration(
 )
 
 data class RefreshConfiguration(
-    val aggregations: ScheduleConfiguration = ScheduleConfiguration(initial = 10000, interval = 300000),
-    val fx: ScheduleConfiguration = ScheduleConfiguration(initial = 10000, interval = 300000),
+    val aggregations: ScheduleConfiguration = ScheduleConfiguration(initial = "10000", interval = "300000"),
+    val fx: ScheduleConfiguration = ScheduleConfiguration(initial = "10000", interval = "300000"),
 )
 
 data class ScheduleConfiguration(
-    val initial: Long = 10000,
-    val interval: Long = 300000,
+    val initial: String = "10000",
+    val interval: String = "300000",
 )
 
 data class FxConfiguration(
