@@ -1,16 +1,14 @@
 package com.jacksonrakena.mixer
 
+import com.jacksonrakena.mixer.web.MdcRequestInterceptor
 import kotlinx.serialization.json.Json
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.client.RestClient
-import com.jacksonrakena.mixer.web.MdcRequestInterceptor
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
-
-
 
 
 @ConfigurationProperties(prefix = "mixer")

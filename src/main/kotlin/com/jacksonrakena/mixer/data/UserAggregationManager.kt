@@ -153,10 +153,45 @@ class UserAggregationManager(
         }
     }
 
+    /**
+     * Attempts to acquire a PostgreSQL advisory lock for the given asset ID.
+     * Returns true if the lock was acquired, false if another process holds it.
+     * On non-PostgreSQL databases (e.g. H2 in tests), always returns true.
+     */
+    private fun tryAdvisoryLock(assetId: Uuid): Boolean {
+        return try {
+            transaction {
+                val key = assetId.hashCode().toLong()
+                exec("SELECT pg_try_advisory_lock($key)") { rs ->
+                    rs.next() && rs.getBoolean(1)
+                } ?: false
+            }
+        } catch (_: Exception) {
+            true
+        }
+    }
+
+    private fun releaseAdvisoryLock(assetId: Uuid) {
+        try {
+            transaction {
+                val key = assetId.hashCode().toLong()
+                exec("SELECT pg_advisory_unlock($key)")
+            }
+        } catch (_: Exception) {
+            // Not on PostgreSQL; no lock to release
+        }
+    }
+
     suspend fun regenerateAggregatesForAsset(
         assetId: Uuid,
         userTimezone: TimeZone,
     ) {
+        // Acquire an advisory lock to prevent concurrent aggregation of the same asset.
+        if (!tryAdvisoryLock(assetId)) {
+            logger.info { "Asset $assetId is being aggregated by another instance, skipping" }
+            return
+        }
+
         val totalStart = System.nanoTime()
         MDC.put("assetId", assetId.toString())
         try {
@@ -287,6 +322,7 @@ class UserAggregationManager(
                 "insert=${String.format("%.1f", insertMs)}ms]"
             }
         } finally {
+            releaseAdvisoryLock(assetId)
             MDC.remove("assetId")
         }
     }
