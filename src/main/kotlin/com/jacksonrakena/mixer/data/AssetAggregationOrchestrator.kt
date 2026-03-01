@@ -19,6 +19,17 @@ class AssetAggregationOrchestrator(
 ) {
     private val logger = KotlinLogging.logger {}
 
+    /**
+     * Resolved plan for an aggregation run, unifying partial and full reaggregation.
+     */
+    private data class AggregationPlan(
+        val mode: String,
+        val startDate: LocalDate?,
+        val initialHolding: Double,
+        val initialPrice: Double?,
+        val initialPriceDate: LocalDate?,
+    )
+
     suspend fun forceAggregateUserAssets(userId: Uuid) {
         val (assetIds, userTimezone) = aggregateRepository.getUserAssetsWithTimezone(userId) ?: return
         MDC.put("userId", userId.toString())
@@ -36,6 +47,44 @@ class AssetAggregationOrchestrator(
         aggregateRepository.deleteAggregatesForAsset(assetId)
     }
 
+    /**
+     * Resolves the aggregation plan: determines start date, initial state, and cleans up
+     * stale aggregates. Returns null if there are no transactions (nothing to aggregate).
+     */
+    private suspend fun resolveAggregationPlan(
+        assetId: Uuid,
+        staleAfter: Long,
+        userTimezone: TimeZone,
+    ): AggregationPlan {
+        // Try partial reaggregation if there's a staleness marker
+        if (staleAfter > 0L) {
+            val staleDate = Instant.fromEpochMilliseconds(staleAfter).toLocalDateTime(userTimezone).date
+            val lastValid = aggregateRepository.getLastAggregateBefore(assetId, staleDate)
+            if (lastValid != null) {
+                aggregateRepository.deleteAggregatesFrom(assetId, lastValid.startDate)
+                return AggregationPlan(
+                    mode = "partial(from=${lastValid.startDate})",
+                    startDate = lastValid.startDate,
+                    initialHolding = lastValid.initialHolding,
+                    initialPrice = lastValid.initialPrice,
+                    initialPriceDate = lastValid.initialPriceDate,
+                )
+            }
+        }
+
+        // Full reaggregation
+        aggregateRepository.deleteAggregatesForAsset(assetId)
+        val earliest = transactionSource.getEarliestTransaction(assetId)
+        val startDate = earliest?.timestamp?.toLocalDateTime(userTimezone)?.date
+        return AggregationPlan(
+            mode = "full",
+            startDate = startDate,
+            initialHolding = 0.0,
+            initialPrice = null,
+            initialPriceDate = null,
+        )
+    }
+
     suspend fun regenerateAggregatesForAsset(
         assetId: Uuid,
         userTimezone: TimeZone,
@@ -50,59 +99,32 @@ class AssetAggregationOrchestrator(
         try {
             val today = Clock.System.now().toLocalDateTime(userTimezone).date
 
-            // Resolve asset state
-            val resolveStart = System.nanoTime()
             val state = aggregateRepository.getAssetAggregationState(assetId)
             if (state == null) {
                 logger.warn { "Asset $assetId not found, skipping reaggregation" }
                 return
             }
-            val resolveMs = (System.nanoTime() - resolveStart) / 1_000_000.0
 
-            // Skip if already up-to-date
             if (state.staleAfter == 0L && state.aggregatedThrough != null && state.aggregatedThrough >= today) {
                 val totalMs = (System.nanoTime() - totalStart) / 1_000_000.0
                 logger.info { "Asset $assetId already up-to-date (through=${state.aggregatedThrough}), skipping | total=${String.format("%.1f", totalMs)}ms" }
                 return
             }
 
-            // Determine if partial reaggregation is possible
-            val partialStart = System.nanoTime()
-            val partialState: PartialAggregateState? = if (state.staleAfter > 0L) {
-                val staleDate = Instant.fromEpochMilliseconds(state.staleAfter).toLocalDateTime(userTimezone).date
-                aggregateRepository.getLastAggregateBefore(assetId, staleDate)
-            } else null
-            val partialCheckMs = (System.nanoTime() - partialStart) / 1_000_000.0
+            // Resolve plan (also deletes stale aggregates)
+            val planStart = System.nanoTime()
+            val plan = resolveAggregationPlan(assetId, state.staleAfter, userTimezone)
+            val planMs = (System.nanoTime() - planStart) / 1_000_000.0
 
-            // Delete stale aggregates
-            val deleteStart = System.nanoTime()
-            if (partialState != null) {
-                aggregateRepository.deleteAggregatesFrom(assetId, partialState.startDate)
-                logger.info { "Partial reaggregation for asset $assetId from ${partialState.startDate}" }
-            } else {
-                aggregateRepository.deleteAggregatesForAsset(assetId)
-            }
-            val deleteMs = (System.nanoTime() - deleteStart) / 1_000_000.0
-
-            // Determine the effective start date for market prices:
-            // partial reaggregation starts from the stale date, full starts from the earliest transaction
-            val effectiveStartDate = if (partialState != null) {
-                partialState.startDate
-            } else {
-                val earliest = transactionSource.getEarliestTransaction(assetId)
-                if (earliest != null) {
-                    earliest.timestamp.toLocalDateTime(userTimezone).date
-                } else {
-                    // No transactions — aggregation will produce nothing, skip market fetch
-                    null
-                }
+            if (plan.mode != "full") {
+                logger.info { "Partial reaggregation for asset $assetId: ${plan.mode}" }
             }
 
-            // Fetch market prices
+            // Fetch market prices (skip if no start date, i.e. no transactions)
             val marketStart = System.nanoTime()
-            val marketPrices = if (effectiveStartDate != null) {
+            val marketPrices = if (plan.startDate != null) {
                 marketPriceResolver.resolveMarketPrices(
-                    state.provider, state.providerData, effectiveStartDate, today, assetId
+                    state.provider, state.providerData, plan.startDate, today, assetId
                 )
             } else null
             val marketMs = (System.nanoTime() - marketStart) / 1_000_000.0
@@ -115,10 +137,10 @@ class AssetAggregationOrchestrator(
                 transactionSource,
                 today,
                 marketPrices,
-                startOverride = partialState?.startDate,
-                initialHolding = partialState?.initialHolding ?: 0.0,
-                initialPrice = partialState?.initialPrice,
-                initialPriceDate = partialState?.initialPriceDate,
+                startOverride = plan.startDate,
+                initialHolding = plan.initialHolding,
+                initialPrice = plan.initialPrice,
+                initialPriceDate = plan.initialPriceDate,
             )
             val aggMs = (System.nanoTime() - aggStart) / 1_000_000.0
 
@@ -129,13 +151,10 @@ class AssetAggregationOrchestrator(
             val insertMs = (System.nanoTime() - insertStart) / 1_000_000.0
             val totalMs = (System.nanoTime() - totalStart) / 1_000_000.0
 
-            val mode = if (partialState != null) "partial(from=${partialState.startDate})" else "full"
             logger.info {
-                "Reaggregation complete for asset $assetId: mode=$mode, entries=${aggregates.size}, through=$today | " +
+                "Reaggregation complete for asset $assetId: mode=${plan.mode}, entries=${aggregates.size}, through=$today | " +
                 "total=${String.format("%.1f", totalMs)}ms " +
-                "[resolve=${String.format("%.1f", resolveMs)}ms, " +
-                "partialCheck=${String.format("%.1f", partialCheckMs)}ms, " +
-                "delete=${String.format("%.1f", deleteMs)}ms, " +
+                "[plan=${String.format("%.1f", planMs)}ms, " +
                 "market=${String.format("%.1f", marketMs)}ms, " +
                 "aggregate=${String.format("%.1f", aggMs)}ms, " +
                 "insert=${String.format("%.1f", insertMs)}ms]"
