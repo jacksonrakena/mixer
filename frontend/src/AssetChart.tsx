@@ -639,6 +639,11 @@ export const AssetChart = ({
                 Source: Yahoo! Finance
               </Chip>
             )}
+            {provider === "USER" && (
+              <Chip size="sm" sx={{ bgcolor: "rgba(46, 125, 50, 0.1)", color: "#2E7D32", fontWeight: 600, fontSize: "11px", height: "20px", mt: 0.5 }}>
+                Manual entry source
+              </Chip>
+            )}
             <Box
               sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5, flexWrap: "wrap" }}
             >
