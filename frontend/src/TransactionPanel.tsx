@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import useMediaQuery from '@mui/material/useMediaQuery'
 import Box from '@mui/joy/Box'
 import Typography from '@mui/joy/Typography'
 import Button from '@mui/joy/Button'
@@ -19,7 +18,6 @@ import DialogTitle from '@mui/joy/DialogTitle'
 import DialogContent from '@mui/joy/DialogContent'
 import DialogActions from '@mui/joy/DialogActions'
 import Divider from '@mui/joy/Divider'
-import Table from '@mui/joy/Table'
 import {
   createTransaction,
   deleteTransaction,
@@ -79,7 +77,6 @@ function paginationRange(current: number, total: number): (number | 'ellipsis')[
 
 export const TransactionPanel = ({ assetId, currency, onTransactionChange }: TransactionPanelProps) => {
   const { user } = useAuth()
-  const isMobile = useMediaQuery('(max-width:600px)')
   const tz = user?.timezone
   const [type, setType] = useState<TransactionType>('Trade')
   const [amount, setAmount] = useState('')
@@ -248,7 +245,7 @@ export const TransactionPanel = ({ assetId, currency, onTransactionChange }: Tra
         )}
       </Sheet>
 
-      {/* Transaction table */}
+      {/* Transaction list */}
       <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 0.5, mb: 1, flexShrink: 0 }}>
           <Typography level="body-xs" sx={{ color: 'neutral.500' }}>
@@ -268,103 +265,80 @@ export const TransactionPanel = ({ assetId, currency, onTransactionChange }: Tra
           </Box>
         ) : (
           <>
-            <Box sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
-              <Table
-                size="sm"
-                hoverRow
-                sx={{
-                  tableLayout: 'auto',
-                  width: '100%',
-                  '--TableCell-paddingX': isMobile ? '6px' : '10px',
-                  '--TableCell-paddingY': '6px',
-                  '& thead th': { color: 'neutral.500', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' },
-                  '& tbody tr': { cursor: 'pointer' },
-                  '& tbody tr:hover': { bgcolor: 'primary.50' },
-                }}
-              >
-                <thead>
-                  <tr>
-                    <th>Type</th>
-                    <th style={{ textAlign: 'right' }}>Amount</th>
-                    {!isMobile && <th style={{ textAlign: 'right' }}>Unit Price</th>}
-                    <th style={{ textAlign: 'right' }}>Total Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map((tx) => {
-                    const isReconciliation = tx.type === 'Reconciliation'
-                    const unitPrice = tx.amount != null && tx.value != null && tx.amount !== 0
-                      ? tx.value / Math.abs(tx.amount)
-                      : null
-                    return (
-                    <tr key={tx.id} onClick={() => setSelectedTx(tx)}>
-                      <td>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-                          <Chip
-                            size="sm"
-                            variant="soft"
-                            color={isReconciliation ? 'neutral' : 'primary'}
-                            sx={{ fontSize: '10px', width: 'fit-content' }}
-                          >
-                            {tx.type}
-                          </Chip>
-                          <Typography level="body-xs" sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                            {formatDate(tx.timestamp, tz)}
-                          </Typography>
-                          <Typography level="body-xs" sx={{ color: 'neutral.500', fontSize: '10px', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                            {formatTime(tx.timestamp, tz)}
-                          </Typography>
-                        </Box>
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        {tx.amount != null ? (
-                          <Typography level="body-xs" sx={{
-                            color: isReconciliation ? 'neutral.600' : (tx.amount >= 0 ? '#059669' : '#dc2626'),
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1, minHeight: 0 }}>
+              {transactions.map((tx) => {
+                const isReconciliation = tx.type === 'Reconciliation'
+                const unitPrice = tx.amount != null && tx.value != null && tx.amount !== 0
+                  ? tx.value / Math.abs(tx.amount)
+                  : null
+                return (
+                  <Box
+                    key={tx.id}
+                    onClick={() => setSelectedTx(tx)}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1.5,
+                      px: 1.5,
+                      py: 1,
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      '&:hover': { bgcolor: 'neutral.50' },
+                    }}
+                  >
+                    {/* Left: type + date */}
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Chip
+                          size="sm"
+                          variant="soft"
+                          color={isReconciliation ? 'neutral' : 'primary'}
+                          sx={{ fontSize: '10px', flexShrink: 0 }}
+                        >
+                          {tx.type}
+                        </Chip>
+                        <Typography level="body-xs" sx={{ color: 'neutral.500', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                          {formatDate(tx.timestamp, tz)}, {formatTime(tx.timestamp, tz)}
+                        </Typography>
+                      </Box>
+                      {/* Amount + unit price on second line */}
+                      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, mt: 0.25 }}>
+                        {tx.amount != null && (
+                          <Typography level="body-sm" sx={{
                             fontWeight: 600,
                             fontVariantNumeric: 'tabular-nums',
+                            color: isReconciliation ? 'neutral.700' : (tx.amount >= 0 ? '#059669' : '#dc2626'),
                           }}>
                             {isReconciliation ? '→ ' : (tx.amount >= 0 ? '+' : '')}
-                            {tx.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                            {tx.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} units
                           </Typography>
-                        ) : (
-                          <Typography level="body-xs" sx={{ color: 'neutral.400' }}>—</Typography>
                         )}
-                      </td>
-                      {!isMobile && (
-                      <td style={{ textAlign: 'right' }}>
-                        {unitPrice != null ? (
-                          <Box>
-                            <Typography level="body-xs" sx={{ color: 'neutral.600', fontVariantNumeric: 'tabular-nums' }}>
-                              ${unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
-                            </Typography>
-                            <Typography level="body-xs" sx={{ color: 'neutral.400', fontSize: '10px' }}>
-                              {currency}
-                            </Typography>
-                          </Box>
-                        ) : (
-                          <Typography level="body-xs" sx={{ color: 'neutral.400' }}>—</Typography>
+                        {unitPrice != null && (
+                          <Typography level="body-xs" sx={{ color: 'neutral.500', fontVariantNumeric: 'tabular-nums' }}>
+                            @ {unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} {currency}
+                          </Typography>
                         )}
-                      </td>
+                      </Box>
+                    </Box>
+
+                    {/* Right: total value */}
+                    <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                      {tx.value != null ? (
+                        <>
+                          <Typography level="body-sm" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                            {tx.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </Typography>
+                          <Typography level="body-xs" sx={{ color: 'neutral.400', fontSize: '10px' }}>
+                            {currency}
+                          </Typography>
+                        </>
+                      ) : (
+                        <Typography level="body-xs" sx={{ color: 'neutral.400' }}>—</Typography>
                       )}
-                      <td style={{ textAlign: 'right' }}>
-                        {tx.value != null ? (
-                          <Box>
-                            <Typography level="body-xs" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                              ${tx.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </Typography>
-                            <Typography level="body-xs" sx={{ color: 'neutral.400', fontSize: '10px' }}>
-                              {currency}
-                            </Typography>
-                          </Box>
-                        ) : (
-                          <Typography level="body-xs" sx={{ color: 'neutral.400' }}>—</Typography>
-                        )}
-                      </td>
-                    </tr>
-                    )
-                  })}
-                </tbody>
-              </Table>
+                    </Box>
+                  </Box>
+                )
+              })}
             </Box>
 
             {/* Pagination */}
