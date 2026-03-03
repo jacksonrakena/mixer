@@ -9,7 +9,6 @@ import Select from '@mui/joy/Select'
 import Option from '@mui/joy/Option'
 import FormLabel from '@mui/joy/FormLabel'
 import FormControl from '@mui/joy/FormControl'
-import FormHelperText from '@mui/joy/FormHelperText'
 import ListItemContent from '@mui/joy/ListItemContent'
 import Sheet from '@mui/joy/Sheet'
 import Chip from '@mui/joy/Chip'
@@ -180,67 +179,73 @@ export const TransactionPanel = ({ assetId, currency, onTransactionChange }: Tra
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minHeight: 0 }}>
       {/* Create form */}
       <Sheet variant="outlined" sx={{ borderRadius: '12px', p: 2, flexShrink: 0 }}>
-        <Typography level="title-sm" sx={{ mb: 2 }}>
+        <Typography level="title-sm" sx={{ mb: 1.5 }}>
           Add Transaction
         </Typography>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          <FormControl size="sm">
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <FormControl size="sm" sx={{ minWidth: 160 }}>
             <FormLabel sx={{ fontSize: '11px' }}>Type</FormLabel>
-            <Select value={type} onChange={(_, v) => v && setType(v)} size="sm">
+            <Select
+              value={type}
+              onChange={(_, v) => v && setType(v)}
+              size="sm"
+              renderValue={(option) => option?.value}
+            >
               <Option value="Trade">
                 <ListItemContent>
                   <Typography level="body-sm" fontWeight={600}>Trade</Typography>
-                  <Typography level="body-xs" sx={{ color: 'neutral.500' }}>Buy or sell units of this asset</Typography>
+                  <Typography level="body-xs" sx={{ color: 'neutral.500' }}>Buy or sell units</Typography>
                 </ListItemContent>
               </Option>
               <Option value="Reconciliation">
                 <ListItemContent>
                   <Typography level="body-sm" fontWeight={600}>Reconciliation</Typography>
-                  <Typography level="body-xs" sx={{ color: 'neutral.500' }}>Set the total units held at a point in time</Typography>
+                  <Typography level="body-xs" sx={{ color: 'neutral.500' }}>Set total units held</Typography>
                 </ListItemContent>
               </Option>
             </Select>
           </FormControl>
 
-          <FormControl size="sm">
+          <FormControl size="sm" sx={{ flex: 1, minWidth: 120 }}>
             <FormLabel sx={{ fontSize: '11px' }}>
-              {type === 'Trade' ? 'Units (positive = buy, negative = sell)' : 'Total units held'}
+              {type === 'Trade' ? 'Units (+buy, −sell)' : 'Total units held'}
             </FormLabel>
             <Input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" placeholder="0.00" size="sm" />
-            {type === 'Reconciliation' && (
-              <FormHelperText sx={{ fontSize: '11px', mt: 0.25 }}>
-                This sets the absolute number of units you hold at this time.
-              </FormHelperText>
-            )}
           </FormControl>
 
-          <FormControl size="sm">
+          <FormControl size="sm" sx={{ flex: 1, minWidth: 120 }}>
             <FormLabel sx={{ fontSize: '11px' }}>Unit price ({currency})</FormLabel>
             <Input value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} type="number" placeholder="0.00" size="sm" />
           </FormControl>
 
-          {computedTotalValue != null && type === 'Trade' && (
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', px: 0.5 }}>
-              <Typography level="body-xs" sx={{ color: 'neutral.500' }}>Total value</Typography>
-              <Typography level="body-sm" sx={{ fontWeight: 700 }}>
-                {computedTotalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
-              </Typography>
-            </Box>
-          )}
-
-          <FormControl size="sm">
+          <FormControl size="sm" sx={{ flex: 1, minWidth: 180 }}>
             <FormLabel sx={{ fontSize: '11px' }}>Date & Time</FormLabel>
             <Input value={timestamp} onChange={(e) => setTimestamp(e.target.value)} type="datetime-local" size="sm" />
           </FormControl>
 
-          {error && (
-            <Typography level="body-xs" color="danger">{error}</Typography>
-          )}
-
-          <Button onClick={handleCreate} loading={submitting} size="sm" variant="soft" color="primary">
+          <Button onClick={handleCreate} loading={submitting} size="sm" variant="soft" color="primary" sx={{ whiteSpace: 'nowrap' }}>
             {type === 'Trade' ? 'Add Trade' : 'Add Reconciliation'}
           </Button>
         </Box>
+
+        {computedTotalValue != null && type === 'Trade' && (
+          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5, mt: 1, px: 0.5 }}>
+            <Typography level="body-xs" sx={{ color: 'neutral.500' }}>Total value:</Typography>
+            <Typography level="body-xs" sx={{ fontWeight: 700 }}>
+              {computedTotalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
+            </Typography>
+          </Box>
+        )}
+
+        {type === 'Reconciliation' && (
+          <Typography level="body-xs" sx={{ color: 'neutral.500', mt: 1, px: 0.5 }}>
+            Sets the absolute number of units you hold at this time.
+          </Typography>
+        )}
+
+        {error && (
+          <Typography level="body-xs" color="danger" sx={{ mt: 1 }}>{error}</Typography>
+        )}
       </Sheet>
 
       {/* Transaction table */}
