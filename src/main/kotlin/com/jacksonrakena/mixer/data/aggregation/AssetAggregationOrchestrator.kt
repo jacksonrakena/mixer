@@ -1,8 +1,10 @@
 package com.jacksonrakena.mixer.data.aggregation
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import org.slf4j.MDC
 import org.springframework.stereotype.Component
@@ -54,6 +56,7 @@ class AssetAggregationOrchestrator(
     private suspend fun resolveAggregationPlan(
         assetId: Uuid,
         staleAfter: Long,
+        aggregatedThrough: LocalDate?,
         userTimezone: TimeZone,
     ): AggregationPlan {
         // Try partial reaggregation if there's a staleness marker
@@ -64,6 +67,22 @@ class AssetAggregationOrchestrator(
                 aggregateRepository.deleteAggregatesFrom(assetId, lastValid.startDate)
                 return AggregationPlan(
                     mode = "partial(from=${lastValid.startDate})",
+                    startDate = lastValid.startDate,
+                    initialHolding = lastValid.initialHolding,
+                    initialPrice = lastValid.initialPrice,
+                    initialPriceDate = lastValid.initialPriceDate,
+                )
+            }
+        }
+
+        // Extend from existing aggregates (e.g. new day, or retrying after stale market data)
+        if (staleAfter == 0L && aggregatedThrough != null) {
+            val extensionStart = aggregatedThrough.plus(1, DateTimeUnit.DAY)
+            val lastValid = aggregateRepository.getLastAggregateBefore(assetId, extensionStart)
+            if (lastValid != null) {
+                aggregateRepository.deleteAggregatesFrom(assetId, extensionStart)
+                return AggregationPlan(
+                    mode = "extend(from=${lastValid.startDate})",
                     startDate = lastValid.startDate,
                     initialHolding = lastValid.initialHolding,
                     initialPrice = lastValid.initialPrice,
@@ -113,7 +132,7 @@ class AssetAggregationOrchestrator(
 
             // Resolve plan (also deletes stale aggregates)
             val planStart = System.nanoTime()
-            val plan = resolveAggregationPlan(assetId, state.staleAfter, userTimezone)
+            val plan = resolveAggregationPlan(assetId, state.staleAfter, state.aggregatedThrough, userTimezone)
             val planMs = (System.nanoTime() - planStart) / 1_000_000.0
 
             if (plan.mode != "full") {
@@ -147,13 +166,23 @@ class AssetAggregationOrchestrator(
             // Persist results
             val insertStart = System.nanoTime()
             aggregateRepository.batchInsertAggregates(assetId, aggregates)
-            aggregateRepository.markAssetAggregated(assetId, today, state.staleAfter)
+
+            // For market-priced assets, only mark as aggregated through the last date
+            // with fresh market data, so the system retries when newer prices become available.
+            val effectiveThrough = if (marketPrices != null) {
+                val lastValueDate = aggregates.lastOrNull()?.valueDate
+                if (lastValueDate != null && lastValueDate < today) lastValueDate else today
+            } else {
+                today
+            }
+            aggregateRepository.markAssetAggregated(assetId, effectiveThrough, state.staleAfter)
             val insertMs = (System.nanoTime() - insertStart) / 1_000_000.0
             val totalMs = (System.nanoTime() - totalStart) / 1_000_000.0
 
             logger.info {
-                "Reaggregation complete for asset $assetId: mode=${plan.mode}, entries=${aggregates.size}, through=$today | " +
-                "total=${String.format("%.1f", totalMs)}ms " +
+                "Reaggregation complete for asset $assetId: mode=${plan.mode}, entries=${aggregates.size}, through=$effectiveThrough" +
+                (if (effectiveThrough != today) " (today=$today)" else "") +
+                " | total=${String.format("%.1f", totalMs)}ms " +
                 "[plan=${String.format("%.1f", planMs)}ms, " +
                 "market=${String.format("%.1f", marketMs)}ms, " +
                 "aggregate=${String.format("%.1f", aggMs)}ms, " +
