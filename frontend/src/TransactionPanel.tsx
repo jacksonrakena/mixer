@@ -9,6 +9,8 @@ import Select from '@mui/joy/Select'
 import Option from '@mui/joy/Option'
 import FormLabel from '@mui/joy/FormLabel'
 import FormControl from '@mui/joy/FormControl'
+import FormHelperText from '@mui/joy/FormHelperText'
+import ListItemContent from '@mui/joy/ListItemContent'
 import Sheet from '@mui/joy/Sheet'
 import Chip from '@mui/joy/Chip'
 import CircularProgress from '@mui/joy/CircularProgress'
@@ -35,7 +37,6 @@ interface TransactionPanelProps {
   onTransactionChange: (staleAfter: number) => void
 }
 
-const TRANSACTION_TYPES: TransactionType[] = ['Trade', 'Reconciliation']
 const PAGE_SIZE = 10
 
 function formatDate(epochMs: number, tz?: string) {
@@ -83,7 +84,7 @@ export const TransactionPanel = ({ assetId, currency, onTransactionChange }: Tra
   const tz = user?.timezone
   const [type, setType] = useState<TransactionType>('Trade')
   const [amount, setAmount] = useState('')
-  const [value, setValue] = useState('')
+  const [unitPrice, setUnitPrice] = useState('')
   const [timestamp, setTimestamp] = useState(() => {
     const d = new Date()
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
@@ -120,9 +121,15 @@ export const TransactionPanel = ({ assetId, currency, onTransactionChange }: Tra
     loadTransactions(0)
   }, [assetId, loadTransactions])
 
+  const parsedAmount = amount ? parseFloat(amount) : undefined
+  const parsedUnitPrice = unitPrice ? parseFloat(unitPrice) : undefined
+  const computedTotalValue = parsedAmount != null && parsedUnitPrice != null
+    ? Math.abs(parsedAmount) * parsedUnitPrice
+    : undefined
+
   const handleCreate = async () => {
-    if (!amount && !value) {
-      setError('Provide at least an amount or value.')
+    if (!amount) {
+      setError(type === 'Trade' ? 'Provide the number of units.' : 'Provide the total units held.')
       return
     }
     setSubmitting(true)
@@ -131,12 +138,12 @@ export const TransactionPanel = ({ assetId, currency, onTransactionChange }: Tra
       const ts = new Date(timestamp).toISOString()
       const res: CreateTransactionResponse = await createTransaction(assetId, {
         type,
-        amount: amount ? parseFloat(amount) : undefined,
-        value: value ? parseFloat(value) : undefined,
+        amount: parsedAmount,
+        value: computedTotalValue,
         timestamp: ts,
       })
       setAmount('')
-      setValue('')
+      setUnitPrice('')
       onTransactionChange(res.staleAfter)
       await loadTransactions(0)
       setPage(0)
@@ -180,22 +187,46 @@ export const TransactionPanel = ({ assetId, currency, onTransactionChange }: Tra
           <FormControl size="sm">
             <FormLabel sx={{ fontSize: '11px' }}>Type</FormLabel>
             <Select value={type} onChange={(_, v) => v && setType(v)} size="sm">
-              {TRANSACTION_TYPES.map((t) => (
-                <Option key={t} value={t}>{t}</Option>
-              ))}
+              <Option value="Trade">
+                <ListItemContent>
+                  <Typography level="body-sm" fontWeight={600}>Trade</Typography>
+                  <Typography level="body-xs" sx={{ color: 'neutral.500' }}>Buy or sell units of this asset</Typography>
+                </ListItemContent>
+              </Option>
+              <Option value="Reconciliation">
+                <ListItemContent>
+                  <Typography level="body-sm" fontWeight={600}>Reconciliation</Typography>
+                  <Typography level="body-xs" sx={{ color: 'neutral.500' }}>Set the total units held at a point in time</Typography>
+                </ListItemContent>
+              </Option>
             </Select>
           </FormControl>
 
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <FormControl size="sm" sx={{ flex: 1 }}>
-              <FormLabel sx={{ fontSize: '11px' }}>Amount</FormLabel>
-              <Input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" placeholder="0.00" size="sm" />
-            </FormControl>
-            <FormControl size="sm" sx={{ flex: 1 }}>
-              <FormLabel sx={{ fontSize: '11px' }}>Value</FormLabel>
-              <Input value={value} onChange={(e) => setValue(e.target.value)} type="number" placeholder="0.00" size="sm" />
-            </FormControl>
-          </Box>
+          <FormControl size="sm">
+            <FormLabel sx={{ fontSize: '11px' }}>
+              {type === 'Trade' ? 'Units (positive = buy, negative = sell)' : 'Total units held'}
+            </FormLabel>
+            <Input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" placeholder="0.00" size="sm" />
+            {type === 'Reconciliation' && (
+              <FormHelperText sx={{ fontSize: '11px', mt: 0.25 }}>
+                This sets the absolute number of units you hold at this time.
+              </FormHelperText>
+            )}
+          </FormControl>
+
+          <FormControl size="sm">
+            <FormLabel sx={{ fontSize: '11px' }}>Unit price ({currency})</FormLabel>
+            <Input value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} type="number" placeholder="0.00" size="sm" />
+          </FormControl>
+
+          {computedTotalValue != null && type === 'Trade' && (
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', px: 0.5 }}>
+              <Typography level="body-xs" sx={{ color: 'neutral.500' }}>Total value</Typography>
+              <Typography level="body-sm" sx={{ fontWeight: 700 }}>
+                {computedTotalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
+              </Typography>
+            </Box>
+          )}
 
           <FormControl size="sm">
             <FormLabel sx={{ fontSize: '11px' }}>Date & Time</FormLabel>
@@ -207,7 +238,7 @@ export const TransactionPanel = ({ assetId, currency, onTransactionChange }: Tra
           )}
 
           <Button onClick={handleCreate} loading={submitting} size="sm" variant="soft" color="primary">
-            Add Transaction
+            {type === 'Trade' ? 'Add Trade' : 'Add Reconciliation'}
           </Button>
         </Box>
       </Sheet>
