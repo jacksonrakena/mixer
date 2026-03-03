@@ -71,6 +71,7 @@ export default function AssetPage({ displayCurrency, assets: propAssets, refresh
         assetId={asset.id}
         assetName={asset.name}
         currency={asset.currency}
+        provider={asset.provider}
         staleAfter={staleAfter}
         aggregatedThrough={aggregatedThrough}
         displayCurrency={displayCurrency}

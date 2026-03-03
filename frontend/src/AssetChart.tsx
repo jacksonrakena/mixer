@@ -408,6 +408,7 @@ interface AssetChartProps {
   assetId: string;
   assetName: string;
   currency: string;
+  provider?: string;
   staleAfter: number; // epoch millis, 0 = not stale
   aggregatedThrough: string | null; // ISO date or null if never aggregated
   displayCurrency?: string;
@@ -485,6 +486,7 @@ export const AssetChart = ({
   assetId,
   assetName,
   currency,
+  provider,
   staleAfter: initialStaleAfter,
   aggregatedThrough: initialAggregatedThrough,
   displayCurrency: displayCurrencyOverride,
@@ -630,6 +632,11 @@ export const AssetChart = ({
               >
                 {assetName}
               </Typography>
+              {provider === "YFIN" && (
+                <Chip size="sm" sx={{ bgcolor: "#7B1FA2", color: "#fff", fontWeight: 600, fontSize: "11px", height: "20px" }}>
+                  Source: Yahoo! Finance
+                </Chip>
+              )}
               {headerAction}
             </Box>
             <Box
