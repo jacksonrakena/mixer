@@ -632,13 +632,13 @@ export const AssetChart = ({
               >
                 {assetName}
               </Typography>
-              {provider === "YFIN" && (
-                <Chip size="sm" sx={{ bgcolor: "#7B1FA2", color: "#fff", fontWeight: 600, fontSize: "11px", height: "20px" }}>
-                  Source: Yahoo! Finance
-                </Chip>
-              )}
               {headerAction}
             </Box>
+            {provider === "YFIN" && (
+              <Chip size="sm" sx={{ bgcolor: "rgba(123, 31, 162, 0.1)", color: "#7B1FA2", fontWeight: 600, fontSize: "11px", height: "20px", mt: 0.5 }}>
+                Source: Yahoo! Finance
+              </Chip>
+            )}
             <Box
               sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5, flexWrap: "wrap" }}
             >
