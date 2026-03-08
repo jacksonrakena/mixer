@@ -49,6 +49,7 @@ export default function LoginPage() {
           mx: 2,
           p: { xs: 3, sm: 4 },
           borderRadius: '16px',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
@@ -64,7 +65,7 @@ export default function LoginPage() {
               fontSize: '16px',
               fontWeight: 800,
               color: 'white',
-              boxShadow: '0 0 16px rgba(59,130,246,0.4)',
+              boxShadow: '0 0 16px rgba(37,99,235,0.4)',
             }}
           >
             M

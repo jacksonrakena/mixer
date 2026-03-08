@@ -98,6 +98,7 @@ export default function AssetPage({ displayCurrency, assets: propAssets, refresh
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06)',
         }}
       >
         <Typography

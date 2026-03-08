@@ -18,6 +18,14 @@ import CurrencySelect from './components/CurrencySelect'
 const SIDEBAR_WIDTH = 260
 const SIDEBAR_COLLAPSED_WIDTH = 56
 
+const SIDEBAR_BG = '#0F172A'
+const SIDEBAR_TEXT = 'rgba(255,255,255,0.85)'
+const SIDEBAR_TEXT_MUTED = 'rgba(255,255,255,0.4)'
+const SIDEBAR_DIVIDER = 'rgba(255,255,255,0.08)'
+const SIDEBAR_HOVER = 'rgba(255,255,255,0.06)'
+const SIDEBAR_ACTIVE_BG = 'rgba(255,255,255,0.08)'
+const SIDEBAR_ACTIVE_TEXT = '#60A5FA'
+
 export default function App() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
@@ -77,7 +85,7 @@ export default function App() {
               width: 32,
               height: 32,
               borderRadius: '8px',
-              background: 'linear-gradient(135deg, var(--joy-palette-primary-400), var(--joy-palette-primary-700))',
+              background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -90,15 +98,13 @@ export default function App() {
             M
           </Box>
           {!isCollapsed && (
-            <Typography level="title-md" sx={{ fontWeight: 700, letterSpacing: '-0.3px' }}>
+            <Typography level="title-md" sx={{ fontWeight: 700, letterSpacing: '-0.3px', color: '#fff' }}>
               Mixer
             </Typography>
           )}
         </Box>
 
-        <Divider />
-
-        {/* Navigation section */}
+        <Divider sx={{ borderColor: SIDEBAR_DIVIDER }} />
         <Box sx={{ flex: 1, overflow: 'auto', py: 1 }}>
           <SidebarItem
             label="Dashboard"
@@ -112,7 +118,7 @@ export default function App() {
             <Typography
               level="body-xs"
               sx={{
-                color: 'neutral.500',
+                color: SIDEBAR_TEXT_MUTED,
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
                 fontWeight: 600,
@@ -125,7 +131,7 @@ export default function App() {
             </Typography>
           )}
 
-          {isCollapsed && <Divider sx={{ my: 0.5 }} />}
+          {isCollapsed && <Divider sx={{ my: 0.5, borderColor: SIDEBAR_DIVIDER }} />}
 
           {loadingAssets ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
@@ -154,11 +160,11 @@ export default function App() {
 
           {!isCollapsed && (
             <>
-              <Divider sx={{ my: 1 }} />
+              <Divider sx={{ my: 1, borderColor: SIDEBAR_DIVIDER }} />
               <Typography
                 level="body-xs"
                 sx={{
-                  color: 'neutral.500',
+                  color: SIDEBAR_TEXT_MUTED,
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
                   fontWeight: 600,
@@ -169,7 +175,20 @@ export default function App() {
               >
                 Display Currency
               </Typography>
-              <Box sx={{ px: 2 }}>
+              <Box sx={{
+                px: 2,
+                '& .MuiSelect-root': {
+                  bgcolor: 'rgba(255,255,255,0.06)',
+                  borderColor: 'rgba(255,255,255,0.1)',
+                  color: SIDEBAR_TEXT,
+                  '--Select-focusedHighlight': 'rgba(255,255,255,0.12)',
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.2)' },
+                  '&.Mui-focusVisible, &:focus-within': { bgcolor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.25)', '--Select-focusedHighlight': 'rgba(255,255,255,0.12)' },
+                },
+                '& .MuiSelect-indicator': { color: SIDEBAR_TEXT_MUTED },
+                '& .MuiSelect-button .MuiTypography-root': { color: SIDEBAR_TEXT },
+                '& .MuiSelect-button .MuiTypography-root:last-child': { color: SIDEBAR_TEXT_MUTED },
+              }}>
                 <CurrencySelect
                   value={displayCurrency}
                   onChange={setDisplayCurrency}
@@ -180,7 +199,7 @@ export default function App() {
           )}
         </Box>
 
-        <Divider />
+        <Divider sx={{ borderColor: SIDEBAR_DIVIDER }} />
 
         {/* Bottom section — user + collapse toggle */}
         <Box sx={{ p: isCollapsed ? 0.5 : 1.5 }}>
@@ -198,7 +217,7 @@ export default function App() {
                   borderRadius: '10px',
                   justifyContent: 'flex-start',
                   textAlign: 'left',
-                  '&:hover': { bgcolor: 'neutral.100' },
+                  '&:hover': { bgcolor: SIDEBAR_HOVER },
                 }}
               >
                 <Box
@@ -206,8 +225,8 @@ export default function App() {
                     width: 32,
                     height: 32,
                     borderRadius: '50%',
-                    bgcolor: 'primary.100',
-                    color: 'primary.700',
+                    bgcolor: 'rgba(59,130,246,0.15)',
+                    color: '#93c5fd',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -219,10 +238,10 @@ export default function App() {
                   {(user?.displayName ?? user?.email ?? '?')[0].toUpperCase()}
                 </Box>
                 <Box sx={{ minWidth: 0 }}>
-                  <Typography level="body-sm" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <Typography level="body-sm" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: SIDEBAR_TEXT }}>
                     {user?.displayName ?? user?.email ?? ''}
                   </Typography>
-                  <Typography level="body-xs" sx={{ color: 'neutral.500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <Typography level="body-xs" sx={{ color: SIDEBAR_TEXT_MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {user?.email ?? ''}
                   </Typography>
                 </Box>
@@ -264,8 +283,9 @@ export default function App() {
                 display: 'flex',
                 width: isCollapsed ? undefined : '100%',
                 borderRadius: '8px',
-                color: 'neutral.500',
+                color: SIDEBAR_TEXT_MUTED,
                 fontSize: '16px',
+                '&:hover': { bgcolor: SIDEBAR_HOVER, color: SIDEBAR_TEXT },
               }}
               title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
@@ -310,7 +330,7 @@ export default function App() {
             width: 28,
             height: 28,
             borderRadius: '7px',
-            background: 'linear-gradient(135deg, var(--joy-palette-primary-400), var(--joy-palette-primary-700))',
+            background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -338,6 +358,7 @@ export default function App() {
             width: SIDEBAR_WIDTH,
             display: 'flex',
             flexDirection: 'column',
+            bgcolor: SIDEBAR_BG,
           },
         }}
       >
@@ -356,8 +377,8 @@ export default function App() {
           top: 0,
           flexDirection: 'column',
           borderRight: '1px solid',
-          borderColor: 'neutral.200',
-          bgcolor: 'background.surface',
+          borderColor: 'rgba(255,255,255,0.06)',
+          bgcolor: SIDEBAR_BG,
           transition: 'width 0.2s ease',
           overflow: 'hidden',
         }}
@@ -429,12 +450,12 @@ function SidebarItem({
         borderRadius: '8px',
         cursor: 'pointer',
         justifyContent: collapsed ? 'center' : 'flex-start',
-        bgcolor: active ? 'primary.50' : 'transparent',
-        color: active ? 'primary.700' : muted ? 'neutral.500' : 'neutral.800',
+        bgcolor: active ? SIDEBAR_ACTIVE_BG : 'transparent',
+        color: active ? SIDEBAR_ACTIVE_TEXT : muted ? SIDEBAR_TEXT_MUTED : SIDEBAR_TEXT,
         fontWeight: active ? 600 : 400,
         transition: 'all 0.12s',
         '&:hover': {
-          bgcolor: active ? 'primary.100' : 'neutral.100',
+          bgcolor: SIDEBAR_HOVER,
         },
       }}
       title={collapsed ? label : undefined}
@@ -459,7 +480,7 @@ function SidebarItem({
             {label}
           </Typography>
           {sublabel && (
-            <Typography level="body-xs" sx={{ color: 'neutral.500' }}>
+            <Typography level="body-xs" sx={{ color: SIDEBAR_TEXT_MUTED }}>
               {sublabel}
             </Typography>
           )}

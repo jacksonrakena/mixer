@@ -54,6 +54,7 @@ export default function SignupPage() {
           mx: 2,
           p: { xs: 3, sm: 4 },
           borderRadius: '16px',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>

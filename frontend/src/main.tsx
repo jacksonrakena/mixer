@@ -50,19 +50,19 @@ const theme = extendTheme({
     light: {
       palette: {
         primary: {
-          "50": "#e0f2f1",
-          "100": "#b2dfdb",
-          "200": "#80cbc4",
-          "300": "#4db6ac",
-          "400": "#26a69a",
-          "500": "#009688",
-          "600": "#00897b",
-          "700": "#00796b",
-          "800": "#00695c",
-          "900": "#004d40",
+          "50": "#eff6ff",
+          "100": "#dbeafe",
+          "200": "#bfdbfe",
+          "300": "#93c5fd",
+          "400": "#60a5fa",
+          "500": "#3b82f6",
+          "600": "#2563eb",
+          "700": "#1d4ed8",
+          "800": "#1e40af",
+          "900": "#1e3a5f",
         },
         background: {
-          body: "#f8fafc",
+          body: "#f8f9fb",
           surface: "#ffffff",
         },
         neutral: {

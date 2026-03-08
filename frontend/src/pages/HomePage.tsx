@@ -214,7 +214,7 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
       </Box>
 
       {/* Main chart card */}
-      <Card variant="outlined" sx={{ borderRadius: { xs: '12px', md: '16px' }, mb: 3 }}>
+      <Card variant="outlined" sx={{ borderRadius: { xs: '12px', md: '16px' }, mb: 3, boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06)' }}>
         <CardContent sx={{ p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
           {/* Range selector */}
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
@@ -336,7 +336,8 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
                   sx={{
                     borderRadius: '12px', p: { xs: 1.5, sm: 2 }, cursor: 'pointer',
                     transition: 'all 0.15s',
-                    '&:hover': { borderColor: 'primary.300', bgcolor: 'primary.50' },
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06)',
+                    '&:hover': { borderColor: 'primary.300', bgcolor: 'primary.50', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
                   }}
                   onClick={() => navigate(`/asset/${asset.assetId}`)}
                 >

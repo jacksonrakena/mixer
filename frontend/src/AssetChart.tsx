@@ -610,7 +610,7 @@ export const AssetChart = ({
   return (
     <Card
       variant="outlined"
-      sx={{ borderRadius: { xs: "12px", md: "16px" } }}
+      sx={{ borderRadius: { xs: "12px", md: "16px" }, boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06)' }}
     >
       <CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
         {/* Header */}

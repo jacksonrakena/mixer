@@ -329,7 +329,7 @@ export function InteractiveChart({
               bottom: CHART_MARGIN.bottom,
               left: Math.min(dragStartX, crosshairX),
               width: Math.abs(crosshairX - dragStartX),
-              background: "rgba(0, 150, 136, 0.08)",
+              background: "rgba(59, 130, 246, 0.1)",
               pointerEvents: "none",
               zIndex: 14,
             }}
