@@ -143,6 +143,8 @@ src/main/resources/
 | delta_other | Double | Other changes |
 | unit_price | Double? | Per-unit price |
 | value_date | LocalDate? | Date the unit price was sourced from |
+| cost_basis | Double | Cumulative cost basis in native currency (average cost method) |
+| cash_flow_native | Double | Net monetary cash flow for this day from trades (for TWRR) |
 
 ### ExchangeRate
 | Column | Type | Notes |
@@ -178,6 +180,16 @@ This is the most complex subsystem. Key concepts:
 3. **Market-priced assets** (provider="YFIN"): prices come from Yahoo Finance via `MarketDataProvider`.
 4. **User assets** (provider="USER"): unit price derived from transaction's value÷amount, carried forward.
 5. If no unit price is available, `nativeValue = 0.0` (not the holding amount).
+
+### Cost Basis & ROI
+- **Cost basis** is tracked cumulatively using the **average cost method**:
+  - Buy (Trade, amount > 0): `costBasis += transaction.value`
+  - Sell (Trade, amount < 0): proportionally reduce `costBasis *= (1 - sellRatio)` where `sellRatio = |sellAmount| / holdingBeforeSale`
+  - Reconciliation: if holding decreases, cost basis is proportionally reduced; if increases, cost basis is unchanged.
+- **Cash flow tracking**: `cashFlowNative` records net monetary flow per day from trades (positive = buy, negative = sell). This prepares for future TWRR implementation.
+- **ROI display**: Frontend shows `(currentValue - costBasis) / costBasis × 100` as ROI percentage, plus dollar return.
+- **FX conversion**: Cost basis is converted at the same exchange rate as the current value (shows native-currency ROI in display currency).
+- **Partial reaggregation**: `initialCostBasis` is carried through `PartialAggregateState` for incremental aggregation.
 
 ### Date Handling (Critical)
 - **`AssetTransactionAggregation.date` is a `String`** in ISO format ("YYYY-MM-DD"), NOT an `Instant`.

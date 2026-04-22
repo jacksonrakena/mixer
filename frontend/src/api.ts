@@ -102,6 +102,12 @@ export interface AssetAggregation {
   unitPrice: number | null;
   /** The date from which the unit price was sourced (may differ from aggregation date due to carry-forward) */
   valueDate: string | null; // ISO local date (YYYY-MM-DD)
+  /** Cumulative cost basis in the asset's native currency (average cost method) */
+  costBasis: number;
+  /** Cost basis converted to the user's display currency, or null if no FX rate was available */
+  displayCostBasis: number | null;
+  /** Net monetary cash flow for this day from trades (positive = buy inflow, negative = sell outflow) */
+  cashFlowNative: number;
 }
 
 // ── Assets ───────────────────────────────────────────────────────────────────
@@ -256,11 +262,13 @@ export interface PortfolioAssetValue {
   assetName: string;
   nativeCurrency: string;
   value: number;
+  costBasis: number;
 }
 
 export interface PortfolioAggregationPoint {
   date: string;
   totalValue: number;
+  totalCostBasis: number;
   displayCurrency: string;
   assetCount: number;
   assetBreakdown: PortfolioAssetValue[];

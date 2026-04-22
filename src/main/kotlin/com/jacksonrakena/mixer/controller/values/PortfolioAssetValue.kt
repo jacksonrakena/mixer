@@ -8,4 +8,5 @@ data class PortfolioAssetValue(
     val assetName: String,
     val nativeCurrency: String,
     val value: Double,
+    val costBasis: Double = 0.0,
 )

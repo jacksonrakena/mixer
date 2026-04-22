@@ -41,6 +41,15 @@ data class AssetTransactionAggregation(
 
     /** The date from which the unit price was sourced (may differ from the aggregation date due to carry-forward). */
     val valueDate: kotlinx.datetime.LocalDate? = null,
+
+    /** Cumulative cost basis in the asset's native currency (average cost method). */
+    val costBasis: Double = 0.0,
+
+    /** Cost basis converted to the user's display currency, or null if no FX rate was available. */
+    val displayCostBasis: Double? = null,
+
+    /** Net monetary cash flow for this day from trades (positive = buy inflow, negative = sell outflow). Useful for TWRR calculation. */
+    val cashFlowNative: Double = 0.0,
 ) {
     companion object {
         fun fromResultRow(row: ResultRow): AssetTransactionAggregation {
@@ -54,6 +63,8 @@ data class AssetTransactionAggregation(
                 nativeValue = row[AssetAggregate.totalValue],
                 unitPrice = row[AssetAggregate.unitPrice],
                 valueDate = row[AssetAggregate.valueDate],
+                costBasis = row[AssetAggregate.costBasis],
+                cashFlowNative = row[AssetAggregate.cashFlowNative],
             )
         }
     }

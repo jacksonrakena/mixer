@@ -103,6 +103,7 @@ class AggregateController(
             return aggregations.map { agg ->
                 agg.copy(
                     displayValue = agg.nativeValue,
+                    displayCostBasis = agg.costBasis,
                     nativeCurrency = assetCurrency,
                     displayCurrency = targetCurrency,
                 )
@@ -121,6 +122,7 @@ class AggregateController(
             if (rateLookup != null) {
                 agg.copy(
                     displayValue = agg.nativeValue * rateLookup.rate,
+                    displayCostBasis = agg.costBasis * rateLookup.rate,
                     nativeCurrency = assetCurrency,
                     displayCurrency = targetCurrency,
                     fxConversion = FxConversionInfo(
@@ -176,7 +178,7 @@ class AggregateController(
         }
 
         // For each asset, fetch aggregations and convert to display currency
-        data class ConvertedPoint(val dateStr: String, val assetId: Uuid, val assetName: String, val nativeCurrency: String, val value: Double)
+        data class ConvertedPoint(val dateStr: String, val assetId: Uuid, val assetName: String, val nativeCurrency: String, val value: Double, val costBasis: Double)
 
         val allPoints = mutableListOf<ConvertedPoint>()
 
@@ -199,7 +201,7 @@ class AggregateController(
 
             if (assetCurrency == targetCurrency) {
                 for (agg in baseAggs) {
-                    allPoints.add(ConvertedPoint(agg.date, assetId, assetName, assetCurrency, agg.nativeValue))
+                    allPoints.add(ConvertedPoint(agg.date, assetId, assetName, assetCurrency, agg.nativeValue, agg.costBasis))
                 }
             } else {
                 val dates = baseAggs.map { LocalDate.parse(it.date) }
@@ -208,7 +210,8 @@ class AggregateController(
                     val aggDate = LocalDate.parse(agg.date)
                     val rate = rateMap[aggDate]
                     val convertedValue = if (rate != null) agg.nativeValue * rate.rate else agg.nativeValue
-                    allPoints.add(ConvertedPoint(agg.date, assetId, assetName, assetCurrency, convertedValue))
+                    val convertedCostBasis = if (rate != null) agg.costBasis * rate.rate else agg.costBasis
+                    allPoints.add(ConvertedPoint(agg.date, assetId, assetName, assetCurrency, convertedValue, convertedCostBasis))
                 }
             }
         }
@@ -219,6 +222,7 @@ class AggregateController(
                 PortfolioAggregationPoint(
                     date = date,
                     totalValue = points.sumOf { it.value },
+                    totalCostBasis = points.sumOf { it.costBasis },
                     displayCurrency = targetCurrency,
                     assetCount = points.map { it.assetId }.distinct().size,
                     assetBreakdown = points.map { p ->
@@ -227,6 +231,7 @@ class AggregateController(
                             assetName = p.assetName,
                             nativeCurrency = p.nativeCurrency,
                             value = p.value,
+                            costBasis = p.costBasis,
                         )
                     },
                 )

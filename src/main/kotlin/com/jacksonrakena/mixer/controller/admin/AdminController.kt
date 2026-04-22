@@ -131,9 +131,9 @@ class AdminController(
         val userIds = transaction {
             User.selectAll().map { it[User.id] }
         }
-        logger.info { "Admin force reaggregating all users (${userIds.size} users), enqueuing background jobs" }
+        logger.info { "Admin force reaggregating all users (${userIds.size} users), clearing existing aggregations first" }
         for (uid in userIds) {
-            jobRequestScheduler.enqueue(RecomputeUserAggregationRequest(uid))
+            jobRequestScheduler.enqueue(RecomputeUserAggregationRequest(uid, clearExisting = true))
         }
         return mapOf("status" to "queued", "usersEnqueued" to userIds.size)
     }

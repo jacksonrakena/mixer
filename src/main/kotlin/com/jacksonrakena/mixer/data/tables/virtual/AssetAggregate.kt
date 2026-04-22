@@ -25,6 +25,12 @@ object AssetAggregate: Table("generated_asset_aggregate") {
     /** The date from which the unit price was sourced (may differ from periodEndDate due to carry-forward). */
     val valueDate = date("value_date").nullable().default(null)
 
+    /** Cumulative cost basis in the asset's native currency (average cost method). */
+    val costBasis = double("cost_basis").default(0.0)
+
+    /** Net monetary cash flow for this day from trades (positive = buy inflow, negative = sell outflow). */
+    val cashFlowNative = double("cash_flow_native").default(0.0)
+
     override val primaryKey: PrimaryKey
         get() = PrimaryKey(assetId, aggregationPeriod, periodEndDate)
 }

@@ -65,6 +65,11 @@ function getDisplayValue(d: AssetAggregation): number {
   return d.displayValue ?? d.nativeValue;
 }
 
+/** Get the best display cost basis for a data point (prefers displayCostBasis, falls back to costBasis) */
+function getDisplayCostBasis(d: AssetAggregation): number {
+  return d.displayCostBasis ?? d.costBasis;
+}
+
 /** Build delta rows for the tooltip (only include non-zero rows) */
 function buildDeltaRows(d: AssetAggregation): DeltaRow[] {
   const rows: DeltaRow[] = [];
@@ -442,6 +447,8 @@ function fillDateRange(
   let lastFxConversion: AssetAggregation["fxConversion"] = null;
   let lastUnitPrice: number | null = null;
   let lastValueDate: string | null = null;
+  let lastCostBasis = 0;
+  let lastDisplayCostBasis: number | null = null;
   let hasSeenData = false;
 
   while (cursor <= end) {
@@ -457,6 +464,8 @@ function fillDateRange(
       lastFxConversion = existing.fxConversion;
       lastUnitPrice = existing.unitPrice;
       lastValueDate = existing.valueDate;
+      lastCostBasis = existing.costBasis;
+      lastDisplayCostBasis = existing.displayCostBasis;
       result.push(existing);
     } else if (hasSeenData) {
       result.push({
@@ -473,6 +482,9 @@ function fillDateRange(
         fxConversion: lastFxConversion,
         unitPrice: lastUnitPrice,
         valueDate: lastValueDate,
+        costBasis: lastCostBasis,
+        displayCostBasis: lastDisplayCostBasis,
+        cashFlowNative: 0,
       });
     }
     cursor.setUTCDate(cursor.getUTCDate() + 1);
@@ -594,11 +606,15 @@ export const AssetChart = ({
   const firstValue = data.length > 0 ? getDisplayValue(data[0]) : null;
   const effectiveDisplayCurrency =
     data.length > 0 ? (data[0].displayCurrency ?? currency) : currency;
-  const change =
-    currentValue !== null && firstValue !== null && firstValue !== 0
-      ? ((currentValue - firstValue) / firstValue) * 100
+  const dollarReturn =
+    currentValue !== null && firstValue !== null
+      ? currentValue - firstValue
       : null;
-  const isPositive = change !== null && change >= 0;
+  const pctROI =
+    dollarReturn !== null && firstValue !== null && firstValue > 0
+      ? (dollarReturn / firstValue) * 100
+      : null;
+  const isPositive = dollarReturn !== null && dollarReturn >= 0;
 
   const xValues = useMemo(
     () => data.map((d) => new Date(d.date).getTime()),
@@ -606,6 +622,11 @@ export const AssetChart = ({
   );
 
   const yValues = useMemo(() => data.map((d) => getDisplayValue(d)), [data]);
+
+  const costBasisValues = useMemo(
+    () => data.map((d) => getDisplayCostBasis(d)),
+    [data],
+  );
 
   return (
     <Card
@@ -704,16 +725,30 @@ export const AssetChart = ({
                       </Typography>
                     </Typography>
                   )}
-                  {change !== null && (
-                    <Chip
-                      size="sm"
-                      variant="soft"
-                      color={isPositive ? "success" : "danger"}
-                      sx={{ fontWeight: 600 }}
-                    >
-                      {isPositive ? "+" : ""}
-                      {change.toFixed(2)}%
-                    </Chip>
+                  {pctROI !== null && dollarReturn !== null && (
+                    <>
+                      <Chip
+                        size="sm"
+                        variant="soft"
+                        color={isPositive ? "success" : "danger"}
+                        sx={{ fontWeight: 600 }}
+                      >
+                        {isPositive ? "+" : ""}
+                        {pctROI.toFixed(2)}%
+                      </Chip>
+                      <Typography
+                        level="body-sm"
+                        sx={{
+                          color: isPositive ? "#059669" : "#dc2626",
+                          fontWeight: 600,
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {isPositive ? "+" : "−"}
+                        {Math.abs(dollarReturn).toLocaleString(undefined, { maximumFractionDigits: 2 })}{" "}
+                        {effectiveDisplayCurrency}
+                      </Typography>
+                    </>
                   )}
                 </>
               )}
@@ -756,6 +791,7 @@ export const AssetChart = ({
           <InteractiveChart
             xValues={xValues}
             yValues={yValues}
+            costBasisValues={costBasisValues}
             currency={effectiveDisplayCurrency}
             label={assetName}
             chartRange={chartRange}

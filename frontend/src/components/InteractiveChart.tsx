@@ -19,6 +19,7 @@ export interface DragInfo {
 interface InteractiveChartProps {
   xValues: number[];
   yValues: number[];
+  costBasisValues?: number[];
   currency: string;
   label: string;
   chartRange: { start: string; end: string } | null;
@@ -37,6 +38,7 @@ interface InteractiveChartProps {
 export function InteractiveChart({
   xValues,
   yValues,
+  costBasisValues,
   currency,
   label,
   chartRange,
@@ -357,6 +359,18 @@ export function InteractiveChart({
             showMark: false,
             area: true,
           },
+          ...(costBasisValues && costBasisValues.some((v) => v > 0)
+            ? [
+                {
+                  data: costBasisValues,
+                  label: "Cost basis",
+                  color: "#9e9e9e",
+                  showMark: false as const,
+                  area: false as const,
+                  id: "cost-basis",
+                },
+              ]
+            : []),
         ]}
         xAxis={[
           {
@@ -392,6 +406,10 @@ export function InteractiveChart({
         hideLegend
         sx={{
           "& .MuiLineElement-root": { strokeWidth: 2 },
+          "& .MuiLineElement-series-cost-basis": {
+            strokeDasharray: "6 4",
+            strokeWidth: 1.5,
+          },
           "& .MuiAreaElement-root": { fillOpacity: 0.12 },
           "& .MuiChartsAxis-line, & .MuiChartsAxis-tick": {
             stroke: "rgba(0,0,0,0.12)",

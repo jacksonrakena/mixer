@@ -39,6 +39,7 @@ data class PartialAggregateState(
     val initialHolding: Double,
     val initialPrice: Double?,
     val initialPriceDate: LocalDate?,
+    val initialCostBasis: Double = 0.0,
 )
 
 /**
@@ -66,6 +67,8 @@ class AggregateRepository {
                 this[AssetAggregate.deltaOther] = agg.amountDeltaOther
                 this[AssetAggregate.unitPrice] = agg.unitPrice
                 this[AssetAggregate.valueDate] = agg.valueDate
+                this[AssetAggregate.costBasis] = agg.costBasis
+                this[AssetAggregate.cashFlowNative] = agg.cashFlowNative
             }
         }
     }
@@ -105,6 +108,7 @@ class AggregateRepository {
             initialHolding = row[AssetAggregate.holding],
             initialPrice = row[AssetAggregate.unitPrice],
             initialPriceDate = row[AssetAggregate.valueDate],
+            initialCostBasis = row[AssetAggregate.costBasis],
         )
     }
 
@@ -118,6 +122,18 @@ class AggregateRepository {
                 it[aggregatedThrough] = through
             }
             Asset.update({ (Asset.id eq assetId) and (Asset.staleAfter eq expectedStaleAfter) }) {
+                it[staleAfter] = 0L
+            }
+        }
+    }
+
+    /**
+     * Resets an asset's aggregatedThrough to null, forcing a full reaggregation on next run.
+     */
+    fun resetAssetAggregatedThrough(assetId: Uuid) {
+        transaction {
+            Asset.update({ Asset.id eq assetId }) {
+                it[aggregatedThrough] = null
                 it[staleAfter] = 0L
             }
         }

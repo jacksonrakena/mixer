@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 data class PortfolioAggregationPoint(
     val date: String,
     val totalValue: Double,
+    val totalCostBasis: Double = 0.0,
     val displayCurrency: String,
     val assetCount: Int,
     val assetBreakdown: List<PortfolioAssetValue>,

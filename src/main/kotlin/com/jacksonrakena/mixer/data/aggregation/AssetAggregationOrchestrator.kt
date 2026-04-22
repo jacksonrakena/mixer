@@ -30,13 +30,21 @@ class AssetAggregationOrchestrator(
         val initialHolding: Double,
         val initialPrice: Double?,
         val initialPriceDate: LocalDate?,
+        val initialCostBasis: Double,
     )
 
-    suspend fun forceAggregateUserAssets(userId: Uuid) {
+    suspend fun forceAggregateUserAssets(userId: Uuid, clearExisting: Boolean = false) {
         val (assetIds, userTimezone) = aggregateRepository.getUserAssetsWithTimezone(userId) ?: return
         MDC.put("userId", userId.toString())
         try {
-            logger.info { "Forcing aggregation for user $userId (tz=$userTimezone), total ${assetIds.size} assets" }
+            if (clearExisting) {
+                logger.info { "Clearing all existing aggregations for user $userId before rebuild" }
+                for (assetId in assetIds) {
+                    aggregateRepository.deleteAggregatesForAsset(assetId)
+                    aggregateRepository.resetAssetAggregatedThrough(assetId)
+                }
+            }
+            logger.info { "Forcing aggregation for user $userId (tz=$userTimezone), total ${assetIds.size} assets, clearExisting=$clearExisting" }
             for (assetId in assetIds) {
                 regenerateAggregatesForAsset(assetId, userTimezone)
             }
@@ -71,6 +79,7 @@ class AssetAggregationOrchestrator(
                     initialHolding = lastValid.initialHolding,
                     initialPrice = lastValid.initialPrice,
                     initialPriceDate = lastValid.initialPriceDate,
+                    initialCostBasis = lastValid.initialCostBasis,
                 )
             }
         }
@@ -87,6 +96,7 @@ class AssetAggregationOrchestrator(
                     initialHolding = lastValid.initialHolding,
                     initialPrice = lastValid.initialPrice,
                     initialPriceDate = lastValid.initialPriceDate,
+                    initialCostBasis = lastValid.initialCostBasis,
                 )
             }
         }
@@ -101,6 +111,7 @@ class AssetAggregationOrchestrator(
             initialHolding = 0.0,
             initialPrice = null,
             initialPriceDate = null,
+            initialCostBasis = 0.0,
         )
     }
 
@@ -160,6 +171,7 @@ class AssetAggregationOrchestrator(
                 initialHolding = plan.initialHolding,
                 initialPrice = plan.initialPrice,
                 initialPriceDate = plan.initialPriceDate,
+                initialCostBasis = plan.initialCostBasis,
             )
             val aggMs = (System.nanoTime() - aggStart) / 1_000_000.0
 

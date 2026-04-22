@@ -382,3 +382,29 @@ databaseChangeLog:
             sql: >
               ALTER TABLE SPRING_SESSION_ATTRIBUTES
               ALTER COLUMN ATTRIBUTE_BYTES SET NOT NULL;
+
+  - changeSet:
+      id: 4-add-cost-basis-columns
+      author: mixer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: generated_asset_aggregate
+                columnName: cost_basis
+      changes:
+        - addColumn:
+            tableName: generated_asset_aggregate
+            columns:
+              - column:
+                  name: cost_basis
+                  type: DOUBLE
+                  defaultValueNumeric: 0.0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: cash_flow_native
+                  type: DOUBLE
+                  defaultValueNumeric: 0.0
+                  constraints:
+                    nullable: false

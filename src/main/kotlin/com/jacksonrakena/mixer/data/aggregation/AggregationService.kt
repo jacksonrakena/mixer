@@ -26,6 +26,7 @@ class AggregationService {
      * @param initialHolding starting holding amount (for partial reaggregation from a known state).
      * @param initialPrice starting unit price (for partial reaggregation).
      * @param initialPriceDate the date of the starting unit price (for partial reaggregation).
+     * @param initialCostBasis starting cost basis (for partial reaggregation from a known state).
      */
     suspend fun forwardAggregate(
         asset: Uuid,
@@ -37,6 +38,7 @@ class AggregationService {
         initialHolding: Double = 0.0,
         initialPrice: Double? = null,
         initialPriceDate: LocalDate? = null,
+        initialCostBasis: Double = 0.0,
     ): Collection<AssetTransactionAggregation> {
         val startDate: LocalDate
         val transactions: List<AssetTransaction>
@@ -54,6 +56,7 @@ class AggregationService {
         val transactionsByDate = transactions.groupBy { it.timestamp.toLocalDateTime(timezone).date }
         val dailyAggregations = mutableListOf<AssetTransactionAggregation>()
         var currentHolding = initialHolding
+        var costBasis = initialCostBasis
 
         val dayCount = end.toEpochDays() - startDate.toEpochDays() + 1
         var lastKnownPrice: Double? = initialPrice
@@ -64,23 +67,40 @@ class AggregationService {
 
             var amountDeltaReconciliation = 0.0
             var amountDeltaTrades = 0.0
+            var cashFlowNative = 0.0
             for (transaction in transactionsForDay) {
+                val txAmount = transaction.amount ?: 0.0
+                val txValue = transaction.value
+
                 when (transaction.type) {
                     AssetTransactionType.Trade -> {
-                        currentHolding += transaction.amount ?: 0.0
-                        amountDeltaTrades += transaction.amount ?: 0.0
+                        // Update cost basis BEFORE holding (need pre-sell holding for proportional reduction)
+                        if (txAmount > 0 && txValue != null) {
+                            costBasis += txValue
+                            cashFlowNative += txValue
+                        } else if (txAmount < 0 && currentHolding > 0) {
+                            val sellRatio = (kotlin.math.abs(txAmount) / currentHolding).coerceAtMost(1.0)
+                            costBasis *= (1.0 - sellRatio)
+                            if (txValue != null) {
+                                cashFlowNative -= txValue
+                            }
+                        }
+                        currentHolding += txAmount
+                        amountDeltaTrades += txAmount
                     }
                     AssetTransactionType.Reconciliation -> {
+                        // If reconciliation reduces holding, proportionally reduce cost basis
+                        if (currentHolding > 0 && txAmount < currentHolding) {
+                            costBasis *= (txAmount / currentHolding).coerceAtLeast(0.0)
+                        }
                         amountDeltaTrades = 0.0
-                        currentHolding = transaction.amount ?: 0.0
-                        amountDeltaReconciliation += transaction.amount ?: 0.0
+                        currentHolding = txAmount
+                        amountDeltaReconciliation += txAmount
                     }
                 }
 
                 // Derive per-unit price from the transaction's value/amount
-                val txAmount = transaction.amount
-                val txValue = transaction.value
-                if (txAmount != null && txAmount != 0.0 && txValue != null) {
+                if (txAmount != 0.0 && txValue != null) {
                     lastKnownPrice = txValue / kotlin.math.abs(txAmount)
                     lastKnownPriceDate = day
                 }
@@ -114,6 +134,8 @@ class AggregationService {
                     amountDeltaTrades = amountDeltaTrades,
                     unitPrice = unitPrice,
                     valueDate = valueDate,
+                    costBasis = costBasis,
+                    cashFlowNative = cashFlowNative,
                 )
             )
         }

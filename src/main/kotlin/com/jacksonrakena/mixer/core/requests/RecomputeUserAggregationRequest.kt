@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component
 import kotlin.uuid.Uuid
 
 @Serializable
-class RecomputeUserAggregationRequest(val userId: Uuid) : JobRequest {
+class RecomputeUserAggregationRequest(val userId: Uuid, val clearExisting: Boolean = false) : JobRequest {
     override fun getJobRequestHandler(): Class<out JobRequestHandler<*>?> {
         return RecomputeUserAggregationRequestHandler::class.java
     }
@@ -33,7 +33,7 @@ class RecomputeUserAggregationRequest(val userId: Uuid) : JobRequest {
             MDC.put("userId", request.userId.toString())
             try {
                 runBlocking {
-                    assetAggregationOrchestrator.forceAggregateUserAssets(request.userId)
+                    assetAggregationOrchestrator.forceAggregateUserAssets(request.userId, request.clearExisting)
                 }
             } finally {
                 MDC.remove("userId")

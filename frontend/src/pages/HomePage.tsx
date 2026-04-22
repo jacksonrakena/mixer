@@ -35,6 +35,7 @@ function fillDateRange(
   const cursor = new Date(startIso + 'T00:00:00Z')
   const end = new Date(endIso + 'T00:00:00Z')
   let lastValue = 0
+  let lastCostBasis = 0
   let lastCurrency = ''
   let lastBreakdown: PortfolioAggregationPoint['assetBreakdown'] = []
   let hasSeenData = false
@@ -45,6 +46,7 @@ function fillDateRange(
     if (existing) {
       hasSeenData = true
       lastValue = existing.totalValue
+      lastCostBasis = existing.totalCostBasis
       lastCurrency = existing.displayCurrency
       lastBreakdown = existing.assetBreakdown
       result.push(existing)
@@ -52,6 +54,7 @@ function fillDateRange(
       result.push({
         date: key,
         totalValue: lastValue,
+        totalCostBasis: lastCostBasis,
         displayCurrency: lastCurrency,
         assetCount: lastBreakdown.length,
         assetBreakdown: lastBreakdown,
@@ -136,19 +139,31 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
   }, [isStale, loadData])
 
   const currentValue = data.length > 0 ? data[data.length - 1].totalValue : null
-  const latestDate = data.length > 0 ? new Date(data[data.length - 1].date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : null
   const firstValue = data.length > 0 ? data[0].totalValue : null
-  const change = currentValue !== null && firstValue !== null && firstValue !== 0
-    ? ((currentValue - firstValue) / firstValue) * 100
+  const latestDate = data.length > 0 ? new Date(data[data.length - 1].date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : null
+  const dollarReturn = currentValue !== null && firstValue !== null
+    ? currentValue - firstValue
     : null
-  const absChange = currentValue !== null && firstValue !== null ? currentValue - firstValue : null
-  const isPositive = change !== null && change >= 0
+  const pctROI = dollarReturn !== null && firstValue !== null && firstValue > 0
+    ? (dollarReturn / firstValue) * 100
+    : null
+  const isPositive = dollarReturn !== null && dollarReturn >= 0
 
   const xValues = useMemo(() => data.map((d) => new Date(d.date).getTime()), [data])
   const yValues = useMemo(() => data.map((d) => d.totalValue), [data])
+  const costBasisValues = useMemo(() => data.map((d) => d.totalCostBasis), [data])
 
   // Latest breakdown for the asset cards
   const latestBreakdown = data.length > 0 ? data[data.length - 1].assetBreakdown : []
+  // Start-of-window breakdown for per-asset window-relative ROI
+  const firstBreakdownByAsset = useMemo(() => {
+    if (data.length === 0) return new Map<string, number>()
+    const map = new Map<string, number>()
+    for (const a of data[0].assetBreakdown) {
+      map.set(a.assetId, a.value)
+    }
+    return map
+  }, [data])
 
   return (
     <Box sx={{ maxWidth: 1100, mx: 'auto', width: '100%' }}>
@@ -195,16 +210,13 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
               ) : (
                 <Typography level="h4" sx={{ color: 'neutral.400' }}>—</Typography>
               )}
-              {change !== null && absChange !== null && (
+              {pctROI !== null && dollarReturn !== null && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                   <Chip size="sm" variant="soft" color={isPositive ? 'success' : 'danger'} sx={{ fontWeight: 600 }}>
-                    {isPositive ? '+' : ''}{change.toFixed(2)}%
+                    {isPositive ? '+' : ''}{pctROI.toFixed(2)}%
                   </Chip>
                   <Typography level="body-sm" sx={{ color: isPositive ? '#059669' : '#dc2626', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                    {isPositive ? '+' : '−'}{Math.abs(absChange).toLocaleString(undefined, { maximumFractionDigits: 2 })} {displayCurrency}
-                  </Typography>
-                  <Typography level="body-xs" sx={{ color: 'neutral.400' }}>
-                    {DATE_RANGES.find((r) => r.value === range)?.label ?? range}
+                    {isPositive ? '+' : '−'}{Math.abs(dollarReturn).toLocaleString(undefined, { maximumFractionDigits: 2 })} {displayCurrency}
                   </Typography>
                 </Box>
               )}
@@ -239,6 +251,7 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
             <InteractiveChart
               xValues={xValues}
               yValues={yValues}
+              costBasisValues={costBasisValues}
               currency={displayCurrency}
               label="Portfolio"
               chartRange={chartRange}
@@ -329,6 +342,10 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
             {latestBreakdown.map((asset) => {
               const pct = currentValue && currentValue > 0 ? (asset.value / currentValue) * 100 : 0
               const assetInfo = assets.find((a) => a.id === asset.assetId)
+              const assetFirstValue = firstBreakdownByAsset.get(asset.assetId) ?? 0
+              const assetReturn = asset.value - assetFirstValue
+              const assetROI = assetFirstValue > 0 ? (assetReturn / assetFirstValue) * 100 : null
+              const assetReturnPositive = assetReturn >= 0
               return (
                 <Sheet
                   key={asset.assetId}
@@ -351,9 +368,15 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
                         {assetInfo?.currency !== displayCurrency && ` → ${displayCurrency}`}
                       </Typography>
                     </Box>
-                    <Chip size="sm" variant="soft" color="neutral" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                      {pct.toFixed(1)}%
-                    </Chip>
+                    {assetROI !== null ? (
+                      <Chip size="sm" variant="soft" color={assetReturnPositive ? 'success' : 'danger'} sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {assetReturnPositive ? '+' : ''}{assetROI.toFixed(1)}%
+                      </Chip>
+                    ) : (
+                      <Chip size="sm" variant="soft" color="neutral" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {pct.toFixed(1)}%
+                      </Chip>
+                    )}
                   </Box>
                   <Typography level="h4" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                     {asset.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
@@ -361,6 +384,11 @@ export default function HomePage({ displayCurrency, assets: propAssets, refreshA
                       {displayCurrency}
                     </Typography>
                   </Typography>
+                  {asset.costBasis > 0 && (
+                    <Typography level="body-xs" sx={{ color: assetReturnPositive ? '#059669' : '#dc2626', fontWeight: 600, fontVariantNumeric: 'tabular-nums', mt: 0.5 }}>
+                      {assetReturnPositive ? '+' : '−'}{Math.abs(assetReturn).toLocaleString(undefined, { maximumFractionDigits: 2 })} {displayCurrency}
+                    </Typography>
+                  )}
                   {/* Allocation bar */}
                   <Box sx={{ mt: 1, height: 4, borderRadius: 2, bgcolor: 'neutral.100', overflow: 'hidden' }}>
                     <Box sx={{ height: '100%', borderRadius: 2, bgcolor: 'primary.400', width: `${Math.min(pct, 100)}%`, transition: 'width 0.3s' }} />
